@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { WorkerPool } from '../src/lib/worker-pool.js';
-import { Errors } from '../src/lib/errors.js';
+import { Errors, isRetryableError } from '../src/lib/errors.js';
 import type { Config, Logger } from '../src/config.js';
 import type { ClaudeRunResult } from '../src/types/index.js';
 
@@ -308,5 +308,114 @@ describe('WorkerPool', () => {
       resolveTask!();
       await taskPromise;
     });
+  });
+
+  describe('retry logic', () => {
+    it('retries on timeout error', async () => {
+      // First call fails with timeout, second succeeds
+      mockRunClaude
+        .mockRejectedValueOnce(Errors.timeout(5000))
+        .mockResolvedValueOnce({ result: 'success', sessionId: undefined, rawOutput: 'success' });
+
+      const result = await workerPool.submit({ prompt: 'test' }, 'req-1');
+
+      expect(result.result).toBe('success');
+      expect(mockRunClaude).toHaveBeenCalledTimes(2);
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Retrying request',
+        expect.objectContaining({ attempt: 1 })
+      );
+    });
+
+    it('retries on rate limit error', async () => {
+      // First call fails with rate limit, second succeeds
+      mockRunClaude
+        .mockRejectedValueOnce(Errors.rateLimit())
+        .mockResolvedValueOnce({ result: 'success', sessionId: undefined, rawOutput: 'success' });
+
+      const result = await workerPool.submit({ prompt: 'test' }, 'req-1');
+
+      expect(result.result).toBe('success');
+      expect(mockRunClaude).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not retry on auth error', async () => {
+      mockRunClaude.mockRejectedValueOnce(Errors.authInvalid());
+
+      await expect(workerPool.submit({ prompt: 'test' }, 'req-1')).rejects.toThrow('Invalid API key');
+      expect(mockRunClaude).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not retry on invalid request error', async () => {
+      mockRunClaude.mockRejectedValueOnce(Errors.invalidRequest('Bad input'));
+
+      await expect(workerPool.submit({ prompt: 'test' }, 'req-1')).rejects.toThrow('Bad input');
+      expect(mockRunClaude).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops retrying after max attempts', async () => {
+      mockRunClaude.mockRejectedValue(Errors.timeout(5000));
+
+      await expect(workerPool.submit({ prompt: 'test' }, 'req-1')).rejects.toThrow('timed out');
+      // 3 total attempts (initial + 2 retries)
+      expect(mockRunClaude).toHaveBeenCalledTimes(3);
+    });
+
+    it('abort signal cancels retries', async () => {
+      const abortController = new AbortController();
+
+      // First call fails, then abort before retry
+      mockRunClaude.mockImplementation(async () => {
+        await new Promise((r) => setTimeout(r, 50));
+        throw Errors.timeout(5000);
+      });
+
+      const promise = workerPool.submit({ prompt: 'test', abortSignal: abortController.signal }, 'req-1');
+
+      // Abort after first failure starts retry delay
+      setTimeout(() => abortController.abort(), 100);
+
+      await expect(promise).rejects.toThrow('aborted');
+    });
+
+    it('does not retry streaming requests', async () => {
+      mockRunClaude.mockRejectedValueOnce(Errors.timeout(5000));
+
+      await expect(workerPool.submit({ prompt: 'test', stream: true }, 'req-1')).rejects.toThrow('timed out');
+      // Only 1 attempt for streaming (no retries)
+      expect(mockRunClaude).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe('isRetryableError', () => {
+  it('returns true for timeout errors', () => {
+    expect(isRetryableError(Errors.timeout(5000))).toBe(true);
+  });
+
+  it('returns true for rate limit errors', () => {
+    expect(isRetryableError(Errors.rateLimit())).toBe(true);
+  });
+
+  it('returns false for auth errors', () => {
+    expect(isRetryableError(Errors.authInvalid())).toBe(false);
+  });
+
+  it('returns false for invalid request errors', () => {
+    expect(isRetryableError(Errors.invalidRequest('bad'))).toBe(false);
+  });
+
+  it('returns false for CLI not found errors', () => {
+    expect(isRetryableError(Errors.cliNotFound())).toBe(false);
+  });
+
+  it('returns true for ECONNRESET errors', () => {
+    const error = new Error('read ECONNRESET');
+    expect(isRetryableError(error)).toBe(true);
+  });
+
+  it('returns false for generic errors', () => {
+    const error = new Error('Something went wrong');
+    expect(isRetryableError(error)).toBe(false);
   });
 });

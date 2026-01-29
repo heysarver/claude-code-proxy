@@ -111,3 +111,20 @@ export const Errors = {
   streamingNotSupported: () =>
     new ApiError(400, ErrorCodes.STREAMING_NOT_SUPPORTED, 'Streaming is not yet supported. Set stream: false or omit the stream parameter.'),
 };
+
+/**
+ * Check if an error should trigger a retry
+ * Only transient errors (timeout, rate limit) are retryable
+ * Auth errors, invalid requests, etc. should fail immediately
+ */
+export function isRetryableError(error: unknown): boolean {
+  if (error instanceof ApiError) {
+    // Only retry transient errors
+    return [ErrorCodes.TIMEOUT, ErrorCodes.RATE_LIMIT].includes(error.code);
+  }
+  // Network errors are retryable
+  if (error instanceof Error && error.message.includes('ECONNRESET')) {
+    return true;
+  }
+  return false;
+}

@@ -354,7 +354,18 @@ describe('OpenAI Routes', () => {
       expect(res.status).toBe(401);
     });
 
-    it('rejects streaming requests', async () => {
+    it('accepts streaming requests', async () => {
+      // Mock runClaude to call onChunk for streaming
+      mockRunClaude.mockImplementationOnce(async (options) => {
+        if (options.stream && options.onChunk) {
+          // Simulate streaming chunks
+          options.onChunk({ type: 'content_block_delta', text: 'Hello ' });
+          options.onChunk({ type: 'content_block_delta', text: 'world!' });
+          options.onChunk({ type: 'message_end', stopReason: 'end_turn' });
+        }
+        return { result: 'Hello world!', sessionId: undefined, rawOutput: 'Hello world!' };
+      });
+
       const res = await request(app)
         .post('/v1/chat/completions')
         .set('Authorization', authHeader)
@@ -364,9 +375,15 @@ describe('OpenAI Routes', () => {
           stream: true,
         });
 
-      expect(res.status).toBe(400);
-      expect(res.body.error.code).toBe('streaming_not_supported');
-      expect(res.body.error.type).toBe('invalid_request_error');
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('text/event-stream');
+
+      // Parse SSE events
+      const events = res.text.split('\n\n').filter(e => e.trim());
+      expect(events.length).toBeGreaterThan(0);
+
+      // Check for [DONE] marker
+      expect(res.text).toContain('data: [DONE]');
     });
 
     it('validates messages array', async () => {

@@ -148,3 +148,28 @@ export function validateChatCompletionRequest(
 
   return null;
 }
+
+/**
+ * Create an OpenAI-compatible streaming chunk
+ */
+export function createStreamChunk(content: string, isLast = false): string {
+  const chunk = {
+    id: `chatcmpl-${Date.now()}`,
+    object: 'chat.completion.chunk',
+    created: Math.floor(Date.now() / 1000),
+    model: PROXY_MODEL_NAME,
+    choices: [{
+      index: 0,
+      delta: isLast ? {} : { content },
+      finish_reason: isLast ? 'stop' : null,
+    }],
+  };
+  return `data: ${JSON.stringify(chunk)}\n\n`;
+}
+
+/**
+ * Create the [DONE] marker for OpenAI streaming
+ */
+export function createStreamEnd(): string {
+  return 'data: [DONE]\n\n';
+}
