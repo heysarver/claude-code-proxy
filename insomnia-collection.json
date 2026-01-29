@@ -17,7 +17,7 @@
       "parentId": "wrk_claude_code_proxy",
       "name": "Base Environment",
       "data": {
-        "base_url": "http://localhost:3000",
+        "base_url": "http://localhost:6789",
         "api_key": "your-api-key-here"
       }
     },
