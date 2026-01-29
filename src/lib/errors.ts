@@ -22,6 +22,10 @@ export const ErrorCodes = {
   QUEUE_FULL: 'queue_full',
   /** Request waited too long in queue (Phase 2) */
   QUEUE_TIMEOUT: 'queue_timeout',
+  /** Session not found (Phase 3) */
+  SESSION_NOT_FOUND: 'session_not_found',
+  /** Session limit reached for API key (Phase 3) */
+  SESSION_LIMIT_REACHED: 'session_limit_reached',
 } as const;
 
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];
@@ -95,4 +99,10 @@ export const Errors = {
 
   queueTimeout: (timeoutMs: number) =>
     new ApiError(504, ErrorCodes.QUEUE_TIMEOUT, `Request waited too long in queue (${timeoutMs}ms)`),
+
+  sessionNotFound: (sessionId: string) =>
+    new ApiError(404, ErrorCodes.SESSION_NOT_FOUND, `Session not found: ${sessionId}`),
+
+  sessionLimitReached: (limit: number) =>
+    new ApiError(429, ErrorCodes.SESSION_LIMIT_REACHED, `Maximum sessions per API key (${limit}) reached. Delete an existing session first.`),
 };

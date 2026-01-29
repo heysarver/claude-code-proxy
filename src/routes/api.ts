@@ -3,12 +3,28 @@ import { v4 as uuidv4 } from 'uuid';
 import type { RunRequest, RunResponse } from '../types/index.js';
 import { Errors } from '../lib/errors.js';
 import type { WorkerPool } from '../lib/worker-pool.js';
+import type { SessionStore } from '../lib/session-store.js';
 import type { Logger } from '../config.js';
+
+/**
+ * Extract API key from Authorization header
+ */
+function extractApiKey(req: Request): string {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    throw Errors.authRequired();
+  }
+  return authHeader.substring(7);
+}
 
 /**
  * Create API router with run endpoint
  */
-export function createApiRouter(workerPool: WorkerPool, logger: Logger): Router {
+export function createApiRouter(
+  workerPool: WorkerPool,
+  sessionStore: SessionStore,
+  logger: Logger
+): Router {
   const router = Router();
 
   /**
@@ -18,6 +34,7 @@ export function createApiRouter(workerPool: WorkerPool, logger: Logger): Router 
   router.post('/run', async (req: Request, res: Response) => {
     const requestId = uuidv4();
     const startTime = Date.now();
+    const apiKey = extractApiKey(req);
 
     logger.info('Received run request', { requestId });
 
@@ -52,11 +69,31 @@ export function createApiRouter(workerPool: WorkerPool, logger: Logger): Router 
       }
     }
 
+    if (body.sessionId !== undefined && typeof body.sessionId !== 'string') {
+      throw Errors.invalidRequest('sessionId must be a string');
+    }
+
+    // Look up existing session if provided
+    let existingSession = null;
+    let resumeSessionId: string | undefined;
+
+    if (body.sessionId) {
+      existingSession = sessionStore.getSession(body.sessionId, apiKey);
+      if (!existingSession) {
+        throw Errors.sessionNotFound(body.sessionId);
+      }
+      resumeSessionId = existingSession.claudeSessionId;
+
+      // Acquire lock for this session (serializes concurrent requests)
+      await sessionStore.acquireLock(body.sessionId);
+    }
+
     logger.debug('Submitting to worker pool', {
       requestId,
       promptLength: body.prompt.length,
       allowedTools: body.allowedTools,
       workingDirectory: body.workingDirectory,
+      sessionId: body.sessionId,
       queueSize: workerPool.size,
     });
 
@@ -77,6 +114,7 @@ export function createApiRouter(workerPool: WorkerPool, logger: Logger): Router 
           prompt: body.prompt,
           allowedTools: body.allowedTools,
           workingDirectory: body.workingDirectory,
+          resumeSessionId,
           abortSignal: abortController.signal,
         },
         requestId
@@ -84,16 +122,30 @@ export function createApiRouter(workerPool: WorkerPool, logger: Logger): Router 
 
       const durationMs = Date.now() - startTime;
 
+      // Handle session creation/update
+      let responseSessionId: string | undefined;
+
+      if (existingSession) {
+        // Update existing session
+        sessionStore.touchSession(existingSession.id);
+        responseSessionId = existingSession.id;
+      } else if (result.sessionId) {
+        // Create new session from Claude's response
+        const newSession = sessionStore.createSession(result.sessionId, apiKey);
+        responseSessionId = newSession.id;
+      }
+
       logger.info('Run request completed', {
         requestId,
         durationMs,
         resultLength: result.result.length,
+        sessionId: responseSessionId,
       });
 
       const response: RunResponse = {
         id: requestId,
         result: result.result,
-        sessionId: result.sessionId,
+        sessionId: responseSessionId,
         durationMs,
       };
 
@@ -101,6 +153,11 @@ export function createApiRouter(workerPool: WorkerPool, logger: Logger): Router 
     } finally {
       // Clean up close listener
       req.off('close', onClose);
+
+      // Release session lock if we acquired one
+      if (existingSession) {
+        sessionStore.releaseLock(existingSession.id);
+      }
     }
   });
 
