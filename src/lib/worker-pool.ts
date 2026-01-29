@@ -21,7 +21,6 @@ export class WorkerPool {
     this.queue = new PQueue({
       concurrency: config.workerConcurrency,
       timeout: config.requestTimeoutMs + config.queueTimeoutMs, // Total time including queue wait
-      throwOnTimeout: true,
     });
 
     this.logger.info('Worker pool initialized', {
@@ -83,8 +82,7 @@ export class WorkerPool {
             { ...options, timeoutMs: remainingTimeoutMs },
             this.logger
           );
-        },
-        { throwOnTimeout: true }
+        }
       );
 
       return result as ClaudeRunResult;

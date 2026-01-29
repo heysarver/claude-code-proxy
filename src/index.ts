@@ -5,12 +5,16 @@ import { createServer, Server } from 'node:http';
 import { loadConfig, createLogger } from './config.js';
 import { createAuthMiddleware } from './lib/auth.js';
 import { createApiRouter } from './routes/api.js';
-import healthRouter from './routes/health.js';
+import { createHealthRouter } from './routes/health.js';
+import { WorkerPool } from './lib/worker-pool.js';
 import { ApiError, Errors } from './lib/errors.js';
 
 // Load configuration
 const config = loadConfig();
 const logger = createLogger(config.logLevel);
+
+// Create worker pool (Phase 2)
+const workerPool = new WorkerPool(config, logger);
 
 // Create Express app
 const app = express();
@@ -29,12 +33,12 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-// Health check (no auth required)
-app.use(healthRouter);
+// Health check (no auth required) - with worker pool stats
+app.use(createHealthRouter(workerPool));
 
 // API routes (auth required)
 const authMiddleware = createAuthMiddleware(config.proxyApiKey);
-app.use('/api', authMiddleware, createApiRouter(config, logger));
+app.use('/api', authMiddleware, createApiRouter(workerPool, logger));
 
 // 404 handler
 app.use((_req: Request, _res: Response, next: NextFunction) => {
@@ -92,7 +96,10 @@ async function shutdown(signal: string): Promise<void> {
     conn.end();
   });
 
-  // Give existing requests time to complete
+  // Shutdown worker pool (wait for active tasks)
+  await workerPool.shutdown();
+
+  // Give existing connections time to drain
   const drainTimeout = 30000; // 30 seconds
   const forceTimeout = 35000; // 35 seconds
 
@@ -142,5 +149,7 @@ server.listen(config.port, () => {
   logger.info(`Claude Code Proxy listening on port ${config.port}`, {
     nodeVersion: process.version,
     logLevel: config.logLevel,
+    workerConcurrency: config.workerConcurrency,
+    maxQueueSize: config.maxQueueSize,
   });
 });
