@@ -111,8 +111,11 @@ export function createOpenAIRouter(
     const abortController = new AbortController();
 
     const onClose = () => {
-      logger.info('Client disconnected, aborting request', { requestId });
-      abortController.abort();
+      // Only abort if the response hasn't been sent yet
+      if (!res.writableEnded) {
+        logger.info('Client disconnected, aborting request', { requestId });
+        abortController.abort();
+      }
     };
     req.on('close', onClose);
 
