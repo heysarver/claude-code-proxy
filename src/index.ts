@@ -7,6 +7,7 @@ import { createAuthMiddleware } from './lib/auth.js';
 import { createApiRouter } from './routes/api.js';
 import { createSessionsRouter } from './routes/sessions.js';
 import { createHealthRouter } from './routes/health.js';
+import { createOpenAIRouter } from './routes/openai.js';
 import { WorkerPool } from './lib/worker-pool.js';
 import { SessionStore } from './lib/session-store.js';
 import { ApiError, Errors } from './lib/errors.js';
@@ -46,6 +47,9 @@ app.use(createHealthRouter(workerPool, sessionStore));
 const authMiddleware = createAuthMiddleware(config.proxyApiKey);
 app.use('/api', authMiddleware, createApiRouter(workerPool, sessionStore, logger));
 app.use('/api/sessions', authMiddleware, createSessionsRouter(sessionStore, logger));
+
+// OpenAI-compatible routes (Phase 4)
+app.use('/v1', authMiddleware, createOpenAIRouter(workerPool, sessionStore, logger));
 
 // 404 handler
 app.use((_req: Request, _res: Response, next: NextFunction) => {
