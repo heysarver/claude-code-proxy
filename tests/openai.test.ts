@@ -13,6 +13,7 @@ import {
   createChatCompletionResponse,
   validateChatCompletionRequest,
   PROXY_MODEL_NAME,
+  CLAUDE_MODELS,
 } from '../src/lib/openai-transformer.js';
 import type { ChatCompletionRequest } from '../src/types/openai.js';
 
@@ -228,17 +229,38 @@ describe('OpenAI Routes', () => {
   });
 
   describe('GET /v1/models', () => {
-    it('returns model list', async () => {
+    it('returns all Claude models', async () => {
       const res = await request(app)
         .get('/v1/models')
         .set('Authorization', authHeader);
 
       expect(res.status).toBe(200);
       expect(res.body.object).toBe('list');
-      expect(res.body.data).toHaveLength(1);
-      expect(res.body.data[0].id).toBe(PROXY_MODEL_NAME);
-      expect(res.body.data[0].object).toBe('model');
-      expect(res.body.data[0].owned_by).toBe('claude-code-proxy');
+      expect(res.body.data).toHaveLength(3);
+
+      // Verify all models are present
+      const modelIds = res.body.data.map((m: { id: string }) => m.id);
+      expect(modelIds).toContain('opus');
+      expect(modelIds).toContain('sonnet');
+      expect(modelIds).toContain('haiku');
+
+      // Verify model format
+      for (const model of res.body.data) {
+        expect(model.object).toBe('model');
+        expect(model.owned_by).toBe('anthropic');
+        expect(typeof model.created).toBe('number');
+      }
+    });
+
+    it('returns models matching CLI aliases', async () => {
+      const res = await request(app)
+        .get('/v1/models')
+        .set('Authorization', authHeader);
+
+      // Model IDs should match the CLAUDE_MODELS constant
+      const expectedIds = CLAUDE_MODELS.map(m => m.id);
+      const actualIds = res.body.data.map((m: { id: string }) => m.id);
+      expect(actualIds).toEqual(expectedIds);
     });
 
     it('requires authentication', async () => {

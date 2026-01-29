@@ -8,9 +8,31 @@ import type {
 import type { Logger } from '../config.js';
 
 /**
- * Model name returned in responses
+ * Default model name returned in responses
  */
 export const PROXY_MODEL_NAME = 'claude-code-proxy';
+
+/**
+ * Available Claude models that can be used via the CLI
+ * These match the aliases accepted by `claude --model`
+ */
+export const CLAUDE_MODELS = [
+  {
+    id: 'opus',
+    name: 'Claude Opus',
+    description: 'Most capable model for complex tasks',
+  },
+  {
+    id: 'sonnet',
+    name: 'Claude Sonnet',
+    description: 'Balanced performance and speed',
+  },
+  {
+    id: 'haiku',
+    name: 'Claude Haiku',
+    description: 'Fastest model for simple tasks',
+  },
+] as const;
 
 /**
  * Convert an array of chat messages to a single Claude prompt

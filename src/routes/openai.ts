@@ -6,7 +6,7 @@ import {
   createChatCompletionResponse,
   logUnsupportedParams,
   validateChatCompletionRequest,
-  PROXY_MODEL_NAME,
+  CLAUDE_MODELS,
 } from '../lib/openai-transformer.js';
 import { ApiError, Errors } from '../lib/errors.js';
 import type { WorkerPool } from '../lib/worker-pool.js';
@@ -50,19 +50,17 @@ export function createOpenAIRouter(
 
   /**
    * GET /v1/models
-   * List available models
+   * List available Claude models (matches CLI aliases)
    */
   router.get('/models', (_req: Request, res: Response) => {
     const response: ModelsResponse = {
       object: 'list',
-      data: [
-        {
-          id: PROXY_MODEL_NAME,
-          object: 'model',
-          created: Math.floor(Date.now() / 1000),
-          owned_by: 'claude-code-proxy',
-        },
-      ],
+      data: CLAUDE_MODELS.map((model) => ({
+        id: model.id,
+        object: 'model' as const,
+        created: Math.floor(Date.now() / 1000),
+        owned_by: 'anthropic',
+      })),
     };
 
     res.json(response);
