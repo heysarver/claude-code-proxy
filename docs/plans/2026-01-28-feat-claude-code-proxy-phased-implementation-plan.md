@@ -238,13 +238,13 @@ src/
 
 #### Acceptance Criteria
 
-- [ ] Responses include `sessionId` for continuation
-- [ ] `sessionId` in request resumes existing conversation
-- [ ] Session TTL with automatic cleanup (default: 1 hour)
-- [ ] Sessions bound to API key (security isolation)
-- [ ] Concurrent requests to same session are serialized
-- [ ] `DELETE /api/sessions/:id` to explicitly end session
-- [ ] `GET /api/sessions` lists active sessions (for API key)
+- [x] Responses include `sessionId` for continuation
+- [x] `sessionId` in request resumes existing conversation
+- [x] Session TTL with automatic cleanup (default: 1 hour)
+- [x] Sessions bound to API key (security isolation)
+- [x] Concurrent requests to same session are serialized
+- [x] `DELETE /api/sessions/:id` to explicitly end session
+- [x] `GET /api/sessions` lists active sessions (for API key)
 
 #### Technical Specification
 

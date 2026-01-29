@@ -5,8 +5,10 @@ import { createServer, Server } from 'node:http';
 import { loadConfig, createLogger } from './config.js';
 import { createAuthMiddleware } from './lib/auth.js';
 import { createApiRouter } from './routes/api.js';
+import { createSessionsRouter } from './routes/sessions.js';
 import { createHealthRouter } from './routes/health.js';
 import { WorkerPool } from './lib/worker-pool.js';
+import { SessionStore } from './lib/session-store.js';
 import { ApiError, Errors } from './lib/errors.js';
 
 // Load configuration
@@ -15,6 +17,10 @@ const logger = createLogger(config.logLevel);
 
 // Create worker pool (Phase 2)
 const workerPool = new WorkerPool(config, logger);
+
+// Create session store (Phase 3)
+const sessionStore = new SessionStore(config, logger);
+sessionStore.startCleanup();
 
 // Create Express app
 const app = express();
@@ -34,11 +40,12 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 // Health check (no auth required) - with worker pool stats
-app.use(createHealthRouter(workerPool));
+app.use(createHealthRouter(workerPool, sessionStore));
 
 // API routes (auth required)
 const authMiddleware = createAuthMiddleware(config.proxyApiKey);
-app.use('/api', authMiddleware, createApiRouter(workerPool, logger));
+app.use('/api', authMiddleware, createApiRouter(workerPool, sessionStore, logger));
+app.use('/api/sessions', authMiddleware, createSessionsRouter(sessionStore, logger));
 
 // 404 handler
 app.use((_req: Request, _res: Response, next: NextFunction) => {
@@ -99,6 +106,9 @@ async function shutdown(signal: string): Promise<void> {
   // Shutdown worker pool (wait for active tasks)
   await workerPool.shutdown();
 
+  // Shutdown session store
+  sessionStore.shutdown();
+
   // Give existing connections time to drain
   const drainTimeout = 30000; // 30 seconds
   const forceTimeout = 35000; // 35 seconds
@@ -151,5 +161,7 @@ server.listen(config.port, () => {
     logLevel: config.logLevel,
     workerConcurrency: config.workerConcurrency,
     maxQueueSize: config.maxQueueSize,
+    sessionTtlMs: config.sessionTtlMs,
+    maxSessionsPerKey: config.maxSessionsPerKey,
   });
 });
