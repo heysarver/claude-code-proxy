@@ -310,6 +310,127 @@
         "mimeType": "application/json",
         "text": "{\n  \"model\": \"haiku\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"What is 15 * 23?\"\n    }\n  ]\n}"
       }
+    },
+    {
+      "_id": "req_openai_chat_streaming",
+      "_type": "request",
+      "parentId": "fld_openai",
+      "name": "Chat Completion - Streaming",
+      "description": "Stream response using Server-Sent Events (SSE)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/v1/chat/completions",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.api_key }}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"model\": \"sonnet\",\n  \"stream\": true,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Write a short poem about programming\"\n    }\n  ]\n}"
+      }
+    },
+    {
+      "_id": "fld_anthropic",
+      "_type": "request_group",
+      "parentId": "wrk_claude_code_proxy",
+      "name": "Anthropic Compatible (/v1)"
+    },
+    {
+      "_id": "req_anthropic_messages_simple",
+      "_type": "request",
+      "parentId": "fld_anthropic",
+      "name": "Messages - Simple",
+      "description": "Basic message request using Anthropic Messages API format",
+      "method": "POST",
+      "url": "{{ _.base_url }}/v1/messages",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.api_key }}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 1024,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Hello! What can you help me with?\"\n    }\n  ]\n}"
+      }
+    },
+    {
+      "_id": "req_anthropic_messages_system",
+      "_type": "request",
+      "parentId": "fld_anthropic",
+      "name": "Messages - With System",
+      "description": "Message request with system prompt for context",
+      "method": "POST",
+      "url": "{{ _.base_url }}/v1/messages",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.api_key }}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 1024,\n  \"system\": \"You are a helpful coding assistant. Be concise and provide examples.\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"How do I read a file in Python?\"\n    }\n  ]\n}"
+      }
+    },
+    {
+      "_id": "req_anthropic_messages_multiturn",
+      "_type": "request",
+      "parentId": "fld_anthropic",
+      "name": "Messages - Multi-turn",
+      "description": "Multi-turn conversation with message history",
+      "method": "POST",
+      "url": "{{ _.base_url }}/v1/messages",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.api_key }}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 1024,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"My name is Alice\"\n    },\n    {\n      \"role\": \"assistant\",\n      \"content\": \"Hello Alice! Nice to meet you. How can I help you today?\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"What is my name?\"\n    }\n  ]\n}"
+      }
+    },
+    {
+      "_id": "req_anthropic_messages_streaming",
+      "_type": "request",
+      "parentId": "fld_anthropic",
+      "name": "Messages - Streaming",
+      "description": "Stream response using Anthropic SSE format with content_block_delta events",
+      "method": "POST",
+      "url": "{{ _.base_url }}/v1/messages",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.api_key }}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 1024,\n  \"stream\": true,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Write a short poem about the ocean\"\n    }\n  ]\n}"
+      }
     }
   ]
 }
