@@ -101,15 +101,14 @@ export function createApiRouter(
     // Create abort controller for client disconnect handling
     const abortController = new AbortController();
 
-    // Abort if client disconnects prematurely
+    // Abort if client disconnects prematurely (before response is sent)
     const onClose = () => {
-      // Only abort if the response hasn't been sent yet
-      if (!res.writableEnded) {
+      if (!res.writableFinished) {
         logger.info('Client disconnected, aborting request', { requestId });
         abortController.abort();
       }
     };
-    req.on('close', onClose);
+    res.on('close', onClose);
 
     try {
       // Submit to worker pool
@@ -157,7 +156,7 @@ export function createApiRouter(
       res.json(response);
     } finally {
       // Clean up close listener
-      req.off('close', onClose);
+      res.off('close', onClose);
 
       // Release session lock if we acquired one
       if (existingSession) {
