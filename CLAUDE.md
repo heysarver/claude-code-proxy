@@ -55,7 +55,7 @@ import { foo } from './lib/foo.ts';
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `PORT` | No | 3000 | Server port |
+| `PORT` | No | 6789 | Server port |
 | `PROXY_API_KEY` | **Yes** | - | API key for authentication |
 | `REQUEST_TIMEOUT_MS` | No | 300000 | Request timeout (5 min) |
 | `LOG_LEVEL` | No | info | debug, info, warn, error |
@@ -79,7 +79,7 @@ Request body:
 
 ## Prerequisites
 
-- Node.js 18+
+- Node.js 20.6+
 - Claude Code CLI installed (`npm install -g @anthropic-ai/claude-code`)
 - Claude Code authenticated (`claude login`)
 
