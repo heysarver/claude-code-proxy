@@ -10,6 +10,12 @@ export interface Config {
   requestTimeoutMs: number;
   /** Log level */
   logLevel: 'debug' | 'info' | 'warn' | 'error';
+  /** Number of concurrent Claude processes (Phase 2) */
+  workerConcurrency: number;
+  /** Maximum requests in queue before rejecting (Phase 2) */
+  maxQueueSize: number;
+  /** Maximum time a request can wait in queue in ms (Phase 2) */
+  queueTimeoutMs: number;
 }
 
 /**
@@ -20,6 +26,9 @@ export function loadConfig(): Config {
   const proxyApiKey = process.env.PROXY_API_KEY;
   const requestTimeoutMs = parseInt(process.env.REQUEST_TIMEOUT_MS || '300000', 10);
   const logLevel = (process.env.LOG_LEVEL || 'info') as Config['logLevel'];
+  const workerConcurrency = parseInt(process.env.WORKER_CONCURRENCY || '2', 10);
+  const maxQueueSize = parseInt(process.env.MAX_QUEUE_SIZE || '100', 10);
+  const queueTimeoutMs = parseInt(process.env.QUEUE_TIMEOUT_MS || '60000', 10);
 
   // Validation
   if (!proxyApiKey) {
@@ -38,11 +47,26 @@ export function loadConfig(): Config {
     throw new Error('LOG_LEVEL must be one of: debug, info, warn, error');
   }
 
+  if (isNaN(workerConcurrency) || workerConcurrency < 1) {
+    throw new Error('WORKER_CONCURRENCY must be at least 1');
+  }
+
+  if (isNaN(maxQueueSize) || maxQueueSize < 1) {
+    throw new Error('MAX_QUEUE_SIZE must be at least 1');
+  }
+
+  if (isNaN(queueTimeoutMs) || queueTimeoutMs < 1000) {
+    throw new Error('QUEUE_TIMEOUT_MS must be at least 1000ms');
+  }
+
   return {
     port,
     proxyApiKey,
     requestTimeoutMs,
     logLevel,
+    workerConcurrency,
+    maxQueueSize,
+    queueTimeoutMs,
   };
 }
 
