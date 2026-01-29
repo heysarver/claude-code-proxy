@@ -1,14 +1,15 @@
 import { Router, Request, Response } from 'express';
 import type { HealthResponse } from '../types/index.js';
 import type { WorkerPool } from '../lib/worker-pool.js';
+import type { SessionStore } from '../lib/session-store.js';
 
 // Track server start time
 const startTime = Date.now();
 
 /**
- * Create health router with worker pool access
+ * Create health router with worker pool and session store access
  */
-export function createHealthRouter(workerPool?: WorkerPool): Router {
+export function createHealthRouter(workerPool?: WorkerPool, sessionStore?: SessionStore): Router {
   const router = Router();
 
   /**
@@ -33,6 +34,15 @@ export function createHealthRouter(workerPool?: WorkerPool): Router {
         pending: stats.pending,
         processing: stats.processing,
         concurrency: stats.concurrency,
+      };
+    }
+
+    // Add session stats if session store is available
+    if (sessionStore) {
+      const stats = sessionStore.getStats();
+      response.sessions = {
+        total: stats.totalSessions,
+        locked: stats.lockedSessions,
       };
     }
 

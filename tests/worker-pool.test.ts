@@ -12,7 +12,7 @@ vi.mock('../src/lib/claude-runner.js', () => ({
 import { runClaude } from '../src/lib/claude-runner.js';
 const mockRunClaude = vi.mocked(runClaude);
 
-// Mock config
+// Mock config with Phase 2 and Phase 3 options
 const mockConfig: Config = {
   port: 3000,
   proxyApiKey: 'test-api-key',
@@ -21,6 +21,9 @@ const mockConfig: Config = {
   workerConcurrency: 2,
   maxQueueSize: 10,
   queueTimeoutMs: 5000,
+  sessionTtlMs: 3600000,
+  maxSessionsPerKey: 10,
+  sessionCleanupIntervalMs: 60000,
 };
 
 // Mock logger
