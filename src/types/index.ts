@@ -8,6 +8,8 @@ export interface RunRequest {
   allowedTools?: string[];
   /** Optional working directory for Claude Code execution */
   workingDirectory?: string;
+  /** Optional session ID to resume an existing conversation (Phase 3) */
+  sessionId?: string;
 }
 
 /**
@@ -55,6 +57,13 @@ export interface HealthResponse {
     /** Maximum concurrent workers */
     concurrency: number;
   };
+  /** Session statistics (Phase 3) */
+  sessions?: {
+    /** Total active sessions */
+    total: number;
+    /** Sessions currently being processed */
+    locked: number;
+  };
 }
 
 /**
@@ -101,4 +110,34 @@ export interface ClaudeRunOptions {
   resumeSessionId?: string;
   /** Abort signal for cancellation (Phase 2) */
   abortSignal?: AbortSignal;
+}
+
+/**
+ * Session storage record (Phase 3)
+ */
+export interface Session {
+  /** External session ID (UUID) */
+  id: string;
+  /** Claude's internal session ID for --resume */
+  claudeSessionId: string;
+  /** Hashed API key that owns this session */
+  apiKeyHash: string;
+  /** When the session was created */
+  createdAt: Date;
+  /** When the session was last accessed */
+  lastAccessedAt: Date;
+  /** Whether the session is currently being processed */
+  locked: boolean;
+}
+
+/**
+ * Public session info returned to API clients (Phase 3)
+ */
+export interface SessionInfo {
+  /** External session ID */
+  id: string;
+  /** When the session was created */
+  createdAt: string;
+  /** When the session was last accessed */
+  lastAccessedAt: string;
 }
