@@ -6,8 +6,11 @@ import {
   createChatCompletionResponse,
   logUnsupportedParams,
   validateChatCompletionRequest,
+  createStreamChunk,
+  createStreamEnd,
   CLAUDE_MODELS,
 } from '../lib/openai-transformer.js';
+import type { StreamChunk } from '../types/index.js';
 import { ApiError, Errors } from '../lib/errors.js';
 import type { WorkerPool } from '../lib/worker-pool.js';
 import type { SessionStore } from '../lib/session-store.js';
@@ -79,14 +82,7 @@ export function createOpenAIRouter(
 
     const body = req.body as ChatCompletionRequest;
 
-    // Check for streaming (not yet supported)
-    if (body.stream === true) {
-      const error = Errors.streamingNotSupported();
-      res.status(error.statusCode).json(toOpenAIError(error));
-      return;
-    }
-
-    // Validate request
+    // Validate request first (before streaming check)
     const validationError = validateChatCompletionRequest(body);
     if (validationError) {
       const error = Errors.invalidRequest(validationError);
@@ -120,7 +116,32 @@ export function createOpenAIRouter(
     res.on('close', onClose);
 
     try {
-      // Submit to worker pool with model selection
+      // Handle streaming
+      if (body.stream === true) {
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+
+        await workerPool.submit({
+          prompt,
+          model: body.model,
+          stream: true,
+          abortSignal: abortController.signal,
+          onChunk: (chunk: StreamChunk) => {
+            if (chunk.type === 'content_block_delta') {
+              res.write(createStreamChunk(chunk.text));
+            } else if (chunk.type === 'message_end') {
+              res.write(createStreamChunk('', true));
+              res.write(createStreamEnd());
+              res.end();
+            }
+          },
+        }, requestId);
+
+        return;
+      }
+
+      // Non-streaming: submit to worker pool with model selection
       const result = await workerPool.submit(
         {
           prompt,
@@ -150,6 +171,13 @@ export function createOpenAIRouter(
       const response = createChatCompletionResponse(result.result, responseSessionId);
       res.json(response);
     } catch (err) {
+      // For streaming, send error event if headers already sent
+      if (body.stream && res.headersSent) {
+        res.write(`data: ${JSON.stringify({ error: { message: err instanceof Error ? err.message : 'Unknown error' } })}\n\n`);
+        res.end();
+        return;
+      }
+
       // Convert errors to OpenAI format
       if (err instanceof ApiError) {
         res.status(err.statusCode).json(toOpenAIError(err));

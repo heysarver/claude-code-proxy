@@ -8,6 +8,7 @@ import { createApiRouter } from './routes/api.js';
 import { createSessionsRouter } from './routes/sessions.js';
 import { createHealthRouter } from './routes/health.js';
 import { createOpenAIRouter } from './routes/openai.js';
+import { createAnthropicRouter } from './routes/anthropic.js';
 import { WorkerPool } from './lib/worker-pool.js';
 import { SessionStore } from './lib/session-store.js';
 import { ApiError, Errors } from './lib/errors.js';
@@ -50,6 +51,9 @@ app.use('/api/sessions', authMiddleware, createSessionsRouter(sessionStore, logg
 
 // OpenAI-compatible routes (Phase 4)
 app.use('/v1', authMiddleware, createOpenAIRouter(workerPool, sessionStore, logger));
+
+// Anthropic-compatible routes (Phase 5)
+app.use('/v1', authMiddleware, createAnthropicRouter(workerPool, sessionStore, logger));
 
 // 404 handler
 app.use((_req: Request, _res: Response, next: NextFunction) => {
