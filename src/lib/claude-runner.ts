@@ -1,5 +1,5 @@
 import { spawn, ChildProcess } from 'node:child_process';
-import type { ClaudeRunOptions, ClaudeRunResult } from '../types/index.js';
+import type { ClaudeRunOptions, ClaudeRunResult, StreamChunk } from '../types/index.js';
 import { Errors } from './errors.js';
 import type { Logger } from '../config.js';
 
@@ -24,7 +24,7 @@ export async function runClaude(
   options: ClaudeRunOptions,
   logger: Logger
 ): Promise<ClaudeRunResult> {
-  const { prompt, model, allowedTools, workingDirectory, timeoutMs = DEFAULT_TIMEOUT_MS, resumeSessionId, abortSignal } = options;
+  const { prompt, model, allowedTools, workingDirectory, timeoutMs = DEFAULT_TIMEOUT_MS, resumeSessionId, abortSignal, stream, onChunk } = options;
 
   // Check if already aborted
   if (abortSignal?.aborted) {
@@ -32,7 +32,8 @@ export async function runClaude(
   }
 
   // Build command arguments
-  const args: string[] = ['-p', prompt, '--output-format', 'json'];
+  const outputFormat = stream ? 'stream-json' : 'json';
+  const args: string[] = ['-p', prompt, '--output-format', outputFormat];
 
   if (model) {
     args.push('--model', model);
@@ -107,9 +108,41 @@ export async function runClaude(
       abortSignal.addEventListener('abort', abortHandler, { once: true });
     }
 
-    // Collect stdout
+    // Collect stdout (with streaming support)
+    let streamBuffer = '';
     child.stdout?.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString();
+      const data = chunk.toString();
+      stdout += data;
+
+      // Handle streaming mode
+      if (stream && onChunk) {
+        streamBuffer += data;
+        const lines = streamBuffer.split('\n');
+        streamBuffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const parsed = JSON.parse(line);
+            // Transform CLI stream output to our StreamChunk format
+            if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+              onChunk({ type: 'content_block_delta', text: parsed.delta.text });
+            } else if (parsed.type === 'message_stop' || parsed.type === 'message_end') {
+              onChunk({ type: 'message_end', stopReason: parsed.message?.stop_reason || 'end_turn' });
+            } else if (parsed.type === 'assistant' && parsed.message?.content) {
+              // Initial message with content
+              const text = typeof parsed.message.content === 'string'
+                ? parsed.message.content
+                : parsed.message.content[0]?.text || '';
+              if (text) {
+                onChunk({ type: 'content_block_delta', text });
+              }
+            }
+          } catch (e) {
+            logger.warn('Failed to parse streaming chunk', { line: line.substring(0, 100) });
+          }
+        }
+      }
     });
 
     // Collect stderr

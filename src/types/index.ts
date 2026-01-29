@@ -97,6 +97,13 @@ export interface ClaudeRunResult {
 }
 
 /**
+ * Streaming chunk types (discriminated union for type safety)
+ */
+export type StreamChunk =
+  | { type: 'content_block_delta'; text: string }
+  | { type: 'message_end'; stopReason: string };
+
+/**
  * Options for running Claude CLI
  */
 export interface ClaudeRunOptions {
@@ -114,6 +121,10 @@ export interface ClaudeRunOptions {
   resumeSessionId?: string;
   /** Abort signal for cancellation (Phase 2) */
   abortSignal?: AbortSignal;
+  /** Enable streaming output (Phase 5) */
+  stream?: boolean;
+  /** Callback for streaming chunks (Phase 5) */
+  onChunk?: (chunk: StreamChunk) => void;
 }
 
 /**
