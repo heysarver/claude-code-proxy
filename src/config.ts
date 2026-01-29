@@ -28,7 +28,7 @@ export interface Config {
  * Load and validate configuration from environment variables
  */
 export function loadConfig(): Config {
-  const port = parseInt(process.env.PORT || '3000', 10);
+  const port = parseInt(process.env.PORT || '6789', 10);
   const proxyApiKey = process.env.PROXY_API_KEY;
   const requestTimeoutMs = parseInt(process.env.REQUEST_TIMEOUT_MS || '300000', 10);
   const logLevel = (process.env.LOG_LEVEL || 'info') as Config['logLevel'];

@@ -26,6 +26,8 @@ export const ErrorCodes = {
   SESSION_NOT_FOUND: 'session_not_found',
   /** Session limit reached for API key (Phase 3) */
   SESSION_LIMIT_REACHED: 'session_limit_reached',
+  /** Streaming not supported (Phase 4) */
+  STREAMING_NOT_SUPPORTED: 'streaming_not_supported',
 } as const;
 
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];
@@ -105,4 +107,7 @@ export const Errors = {
 
   sessionLimitReached: (limit: number) =>
     new ApiError(429, ErrorCodes.SESSION_LIMIT_REACHED, `Maximum sessions per API key (${limit}) reached. Delete an existing session first.`),
+
+  streamingNotSupported: () =>
+    new ApiError(400, ErrorCodes.STREAMING_NOT_SUPPORTED, 'Streaming is not yet supported. Set stream: false or omit the stream parameter.'),
 };

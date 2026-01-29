@@ -24,7 +24,7 @@ export async function runClaude(
   options: ClaudeRunOptions,
   logger: Logger
 ): Promise<ClaudeRunResult> {
-  const { prompt, allowedTools, workingDirectory, timeoutMs = DEFAULT_TIMEOUT_MS, resumeSessionId, abortSignal } = options;
+  const { prompt, model, allowedTools, workingDirectory, timeoutMs = DEFAULT_TIMEOUT_MS, resumeSessionId, abortSignal } = options;
 
   // Check if already aborted
   if (abortSignal?.aborted) {
@@ -33,6 +33,10 @@ export async function runClaude(
 
   // Build command arguments
   const args: string[] = ['-p', prompt, '--output-format', 'json'];
+
+  if (model) {
+    args.push('--model', model);
+  }
 
   if (allowedTools && allowedTools.length > 0) {
     args.push('--allowedTools', allowedTools.join(','));
