@@ -279,6 +279,29 @@ describe('Worker Pool', () => {
     expect(maxActive).toBeLessThanOrEqual(2);
   });
 
+  it('does not abort when request completes normally with delay', async () => {
+    // This test ensures the close event handler doesn't cause false aborts
+    // when the response is sent before the close event fires
+    const app = createTestApp(workerPool, sessionStore);
+    const authHeader = `Bearer ${mockConfig.proxyApiKey}`;
+
+    mockRunClaude.mockImplementation(async () => {
+      // Simulate a slow CLI call
+      await new Promise((r) => setTimeout(r, 100));
+      return { result: 'Success after delay', sessionId: undefined, rawOutput: 'Success after delay' };
+    });
+
+    const res = await request(app)
+      .post('/api/run')
+      .set('Authorization', authHeader)
+      .send({ prompt: 'test' });
+
+    // Should succeed, not abort
+    expect(res.status).toBe(200);
+    expect(res.body.result).toBe('Success after delay');
+    expect(res.body.error).toBeUndefined();
+  });
+
   // Note: Queue full tests are in worker-pool.test.ts
   // as they require precise control over task execution timing
 
