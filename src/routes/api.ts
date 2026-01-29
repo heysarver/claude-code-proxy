@@ -1,19 +1,19 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import type { RunRequest, RunResponse } from '../types/index.js';
-import { runClaude } from '../lib/claude-runner.js';
 import { Errors } from '../lib/errors.js';
-import type { Config, Logger } from '../config.js';
+import type { WorkerPool } from '../lib/worker-pool.js';
+import type { Logger } from '../config.js';
 
 /**
  * Create API router with run endpoint
  */
-export function createApiRouter(config: Config, logger: Logger): Router {
+export function createApiRouter(workerPool: WorkerPool, logger: Logger): Router {
   const router = Router();
 
   /**
    * POST /api/run
-   * Execute a prompt with Claude Code
+   * Execute a prompt with Claude Code via worker pool
    */
   router.post('/run', async (req: Request, res: Response) => {
     const requestId = uuidv4();
@@ -52,40 +52,56 @@ export function createApiRouter(config: Config, logger: Logger): Router {
       }
     }
 
-    logger.debug('Running Claude CLI', {
+    logger.debug('Submitting to worker pool', {
       requestId,
       promptLength: body.prompt.length,
       allowedTools: body.allowedTools,
       workingDirectory: body.workingDirectory,
+      queueSize: workerPool.size,
     });
 
-    // Execute Claude
-    const result = await runClaude(
-      {
-        prompt: body.prompt,
-        allowedTools: body.allowedTools,
-        workingDirectory: body.workingDirectory,
-        timeoutMs: config.requestTimeoutMs,
-      },
-      logger
-    );
+    // Create abort controller for client disconnect handling
+    const abortController = new AbortController();
 
-    const durationMs = Date.now() - startTime;
-
-    logger.info('Run request completed', {
-      requestId,
-      durationMs,
-      resultLength: result.result.length,
-    });
-
-    const response: RunResponse = {
-      id: requestId,
-      result: result.result,
-      sessionId: result.sessionId,
-      durationMs,
+    // Abort if client disconnects
+    const onClose = () => {
+      logger.info('Client disconnected, aborting request', { requestId });
+      abortController.abort();
     };
+    req.on('close', onClose);
 
-    res.json(response);
+    try {
+      // Submit to worker pool
+      const result = await workerPool.submit(
+        {
+          prompt: body.prompt,
+          allowedTools: body.allowedTools,
+          workingDirectory: body.workingDirectory,
+          abortSignal: abortController.signal,
+        },
+        requestId
+      );
+
+      const durationMs = Date.now() - startTime;
+
+      logger.info('Run request completed', {
+        requestId,
+        durationMs,
+        resultLength: result.result.length,
+      });
+
+      const response: RunResponse = {
+        id: requestId,
+        result: result.result,
+        sessionId: result.sessionId,
+        durationMs,
+      };
+
+      res.json(response);
+    } finally {
+      // Clean up close listener
+      req.off('close', onClose);
+    }
   });
 
   return router;

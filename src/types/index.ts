@@ -46,6 +46,31 @@ export interface HealthResponse {
   status: 'ok' | 'degraded';
   /** Server uptime in seconds */
   uptime: number;
+  /** Queue statistics (Phase 2) */
+  queue?: {
+    /** Requests waiting in queue */
+    pending: number;
+    /** Requests currently being processed */
+    processing: number;
+    /** Maximum concurrent workers */
+    concurrency: number;
+  };
+}
+
+/**
+ * Worker pool statistics (Phase 2)
+ */
+export interface WorkerPoolStats {
+  /** Requests waiting in queue */
+  pending: number;
+  /** Requests currently being processed */
+  processing: number;
+  /** Maximum concurrent workers */
+  concurrency: number;
+  /** Maximum queue size */
+  maxQueueSize: number;
+  /** Whether the pool is paused */
+  isPaused: boolean;
 }
 
 /**
@@ -74,4 +99,6 @@ export interface ClaudeRunOptions {
   timeoutMs?: number;
   /** Session ID to resume (Phase 3) */
   resumeSessionId?: string;
+  /** Abort signal for cancellation (Phase 2) */
+  abortSignal?: AbortSignal;
 }
