@@ -67,14 +67,14 @@ Endpoints:
 
 #### Acceptance Criteria
 
-- [ ] Project bootstrapped with TypeScript, Express 5, proper tooling
-- [ ] `POST /api/run` endpoint accepts `{prompt: string}` and returns Claude response
-- [ ] API key authentication via `Authorization: Bearer <key>` header
-- [ ] Single worker (no concurrency, no queue)
-- [ ] Basic error handling for common failures
-- [ ] `GET /health` endpoint returns server status
-- [ ] Graceful shutdown on SIGTERM/SIGINT
-- [ ] Environment-based configuration
+- [x] Project bootstrapped with TypeScript, Express 5, proper tooling
+- [x] `POST /api/run` endpoint accepts `{prompt: string}` and returns Claude response
+- [x] API key authentication via `Authorization: Bearer <key>` header
+- [x] Single worker (no concurrency, no queue)
+- [x] Basic error handling for common failures
+- [x] `GET /health` endpoint returns server status
+- [x] Graceful shutdown on SIGTERM/SIGINT
+- [x] Environment-based configuration
 
 #### Technical Specification
 
