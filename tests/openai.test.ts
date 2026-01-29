@@ -27,7 +27,7 @@ const mockRunClaude = vi.mocked(runClaude);
 
 // Mock config
 const mockConfig: Config = {
-  port: 3000,
+  port: 6789,
   proxyApiKey: 'test-api-key',
   requestTimeoutMs: 5000,
   logLevel: 'error',
