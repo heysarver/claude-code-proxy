@@ -16,6 +16,12 @@ export interface Config {
   maxQueueSize: number;
   /** Maximum time a request can wait in queue in ms (Phase 2) */
   queueTimeoutMs: number;
+  /** Session TTL in milliseconds (Phase 3) */
+  sessionTtlMs: number;
+  /** Maximum sessions per API key (Phase 3) */
+  maxSessionsPerKey: number;
+  /** Session cleanup interval in milliseconds (Phase 3) */
+  sessionCleanupIntervalMs: number;
 }
 
 /**
@@ -29,6 +35,9 @@ export function loadConfig(): Config {
   const workerConcurrency = parseInt(process.env.WORKER_CONCURRENCY || '2', 10);
   const maxQueueSize = parseInt(process.env.MAX_QUEUE_SIZE || '100', 10);
   const queueTimeoutMs = parseInt(process.env.QUEUE_TIMEOUT_MS || '60000', 10);
+  const sessionTtlMs = parseInt(process.env.SESSION_TTL_MS || '3600000', 10);
+  const maxSessionsPerKey = parseInt(process.env.MAX_SESSIONS_PER_KEY || '10', 10);
+  const sessionCleanupIntervalMs = parseInt(process.env.SESSION_CLEANUP_INTERVAL_MS || '60000', 10);
 
   // Validation
   if (!proxyApiKey) {
@@ -59,6 +68,18 @@ export function loadConfig(): Config {
     throw new Error('QUEUE_TIMEOUT_MS must be at least 1000ms');
   }
 
+  if (isNaN(sessionTtlMs) || sessionTtlMs < 60000) {
+    throw new Error('SESSION_TTL_MS must be at least 60000ms (1 minute)');
+  }
+
+  if (isNaN(maxSessionsPerKey) || maxSessionsPerKey < 1) {
+    throw new Error('MAX_SESSIONS_PER_KEY must be at least 1');
+  }
+
+  if (isNaN(sessionCleanupIntervalMs) || sessionCleanupIntervalMs < 1000) {
+    throw new Error('SESSION_CLEANUP_INTERVAL_MS must be at least 1000ms');
+  }
+
   return {
     port,
     proxyApiKey,
@@ -67,6 +88,9 @@ export function loadConfig(): Config {
     workerConcurrency,
     maxQueueSize,
     queueTimeoutMs,
+    sessionTtlMs,
+    maxSessionsPerKey,
+    sessionCleanupIntervalMs,
   };
 }
 

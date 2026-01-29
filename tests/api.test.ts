@@ -5,6 +5,7 @@ import { createAuthMiddleware } from '../src/lib/auth.js';
 import { createApiRouter } from '../src/routes/api.js';
 import { createHealthRouter } from '../src/routes/health.js';
 import { WorkerPool } from '../src/lib/worker-pool.js';
+import { SessionStore } from '../src/lib/session-store.js';
 import { ApiError, Errors } from '../src/lib/errors.js';
 import type { Config, Logger } from '../src/config.js';
 import type { ClaudeRunResult } from '../src/types/index.js';
@@ -17,7 +18,7 @@ vi.mock('../src/lib/claude-runner.js', () => ({
 import { runClaude } from '../src/lib/claude-runner.js';
 const mockRunClaude = vi.mocked(runClaude);
 
-// Mock config with Phase 2 options
+// Mock config with Phase 2 and Phase 3 options
 const mockConfig: Config = {
   port: 3000,
   proxyApiKey: 'test-api-key',
@@ -26,6 +27,9 @@ const mockConfig: Config = {
   workerConcurrency: 2,
   maxQueueSize: 10,
   queueTimeoutMs: 5000,
+  sessionTtlMs: 3600000,
+  maxSessionsPerKey: 10,
+  sessionCleanupIntervalMs: 60000,
 };
 
 // Mock logger
@@ -41,17 +45,17 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-// Create test app with worker pool
-function createTestApp(workerPool: WorkerPool): Express {
+// Create test app with worker pool and session store
+function createTestApp(workerPool: WorkerPool, sessionStore: SessionStore): Express {
   const app = express();
   app.use(express.json());
 
-  // Health (no auth) - with worker pool stats
-  app.use(createHealthRouter(workerPool));
+  // Health (no auth) - with worker pool and session stats
+  app.use(createHealthRouter(workerPool, sessionStore));
 
   // API routes (with auth)
   const authMiddleware = createAuthMiddleware(mockConfig.proxyApiKey);
-  app.use('/api', authMiddleware, createApiRouter(workerPool, mockLogger));
+  app.use('/api', authMiddleware, createApiRouter(workerPool, sessionStore, mockLogger));
 
   // Error handler
   const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
@@ -68,17 +72,20 @@ function createTestApp(workerPool: WorkerPool): Express {
 
 describe('Health Endpoint', () => {
   let workerPool: WorkerPool;
+  let sessionStore: SessionStore;
 
   beforeEach(() => {
     workerPool = new WorkerPool(mockConfig, mockLogger);
+    sessionStore = new SessionStore(mockConfig, mockLogger);
   });
 
   afterEach(async () => {
     await workerPool.shutdown();
+    sessionStore.shutdown();
   });
 
-  it('returns status ok with queue stats', async () => {
-    const app = createTestApp(workerPool);
+  it('returns status ok with queue and session stats', async () => {
+    const app = createTestApp(workerPool, sessionStore);
     const res = await request(app).get('/health');
 
     expect(res.status).toBe(200);
@@ -88,6 +95,9 @@ describe('Health Endpoint', () => {
     expect(res.body.queue.pending).toBe(0);
     expect(res.body.queue.processing).toBe(0);
     expect(res.body.queue.concurrency).toBe(2);
+    expect(res.body.sessions).toBeDefined();
+    expect(res.body.sessions.total).toBe(0);
+    expect(res.body.sessions.locked).toBe(0);
   });
 
   // Note: Queue capacity and degraded status tests are in worker-pool.test.ts
@@ -96,17 +106,20 @@ describe('Health Endpoint', () => {
 
 describe('Authentication', () => {
   let workerPool: WorkerPool;
+  let sessionStore: SessionStore;
 
   beforeEach(() => {
     workerPool = new WorkerPool(mockConfig, mockLogger);
+    sessionStore = new SessionStore(mockConfig, mockLogger);
   });
 
   afterEach(async () => {
     await workerPool.shutdown();
+    sessionStore.shutdown();
   });
 
   it('rejects requests without auth header', async () => {
-    const app = createTestApp(workerPool);
+    const app = createTestApp(workerPool, sessionStore);
     const res = await request(app).post('/api/run').send({ prompt: 'test' });
 
     expect(res.status).toBe(401);
@@ -115,7 +128,7 @@ describe('Authentication', () => {
   });
 
   it('rejects requests with invalid auth format', async () => {
-    const app = createTestApp(workerPool);
+    const app = createTestApp(workerPool, sessionStore);
     const res = await request(app)
       .post('/api/run')
       .set('Authorization', 'InvalidFormat')
@@ -126,7 +139,7 @@ describe('Authentication', () => {
   });
 
   it('rejects requests with wrong API key', async () => {
-    const app = createTestApp(workerPool);
+    const app = createTestApp(workerPool, sessionStore);
     const res = await request(app)
       .post('/api/run')
       .set('Authorization', 'Bearer wrong-key')
@@ -139,16 +152,19 @@ describe('Authentication', () => {
 
 describe('Request Validation', () => {
   let workerPool: WorkerPool;
+  let sessionStore: SessionStore;
   let app: Express;
   const authHeader = `Bearer ${mockConfig.proxyApiKey}`;
 
   beforeEach(() => {
     workerPool = new WorkerPool(mockConfig, mockLogger);
-    app = createTestApp(workerPool);
+    sessionStore = new SessionStore(mockConfig, mockLogger);
+    app = createTestApp(workerPool, sessionStore);
   });
 
   afterEach(async () => {
     await workerPool.shutdown();
+    sessionStore.shutdown();
   });
 
   it('rejects requests without prompt', async () => {
@@ -195,23 +211,26 @@ describe('Request Validation', () => {
 
 describe('Worker Pool', () => {
   let workerPool: WorkerPool;
+  let sessionStore: SessionStore;
 
   beforeEach(() => {
     workerPool = new WorkerPool(mockConfig, mockLogger);
+    sessionStore = new SessionStore(mockConfig, mockLogger);
   });
 
   afterEach(async () => {
     await workerPool.shutdown();
+    sessionStore.shutdown();
   });
 
   it('processes requests through the queue', async () => {
-    const app = createTestApp(workerPool);
+    const app = createTestApp(workerPool, sessionStore);
     const authHeader = `Bearer ${mockConfig.proxyApiKey}`;
 
     const expectedResult: ClaudeRunResult = {
       result: 'Test response',
-      sessionId: 'session-123',
-      rawOutput: '{"result":"Test response","session_id":"session-123"}',
+      sessionId: 'claude-internal-session-123',
+      rawOutput: '{"result":"Test response","session_id":"claude-internal-session-123"}',
     };
 
     mockRunClaude.mockResolvedValueOnce(expectedResult);
@@ -223,13 +242,15 @@ describe('Worker Pool', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.result).toBe('Test response');
-    expect(res.body.sessionId).toBe('session-123');
+    // Session ID should be a UUID (our external ID), not Claude's internal ID
+    expect(res.body.sessionId).toBeDefined();
+    expect(res.body.sessionId).not.toBe('claude-internal-session-123');
     expect(typeof res.body.durationMs).toBe('number');
     expect(mockRunClaude).toHaveBeenCalledOnce();
   });
 
   it('respects concurrency limit', async () => {
-    const app = createTestApp(workerPool);
+    const app = createTestApp(workerPool, sessionStore);
     const authHeader = `Bearer ${mockConfig.proxyApiKey}`;
 
     // Track when each request starts and ends
@@ -262,7 +283,7 @@ describe('Worker Pool', () => {
   // as they require precise control over task execution timing
 
   it('rejects requests during shutdown', async () => {
-    const app = createTestApp(workerPool);
+    const app = createTestApp(workerPool, sessionStore);
     const authHeader = `Bearer ${mockConfig.proxyApiKey}`;
 
     // Start shutdown
@@ -334,5 +355,17 @@ describe('Error Classes', () => {
     expect(queueTimeout.statusCode).toBe(504);
     expect(queueTimeout.code).toBe('queue_timeout');
     expect(queueTimeout.message).toContain('60000');
+  });
+
+  it('Phase 3 error factories create correct errors', () => {
+    const sessionNotFound = Errors.sessionNotFound('test-session');
+    expect(sessionNotFound.statusCode).toBe(404);
+    expect(sessionNotFound.code).toBe('session_not_found');
+    expect(sessionNotFound.message).toContain('test-session');
+
+    const sessionLimit = Errors.sessionLimitReached(10);
+    expect(sessionLimit.statusCode).toBe(429);
+    expect(sessionLimit.code).toBe('session_limit_reached');
+    expect(sessionLimit.message).toContain('10');
   });
 });
