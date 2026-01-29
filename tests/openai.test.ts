@@ -442,5 +442,48 @@ describe('OpenAI Routes', () => {
         })
       );
     });
+
+    it('passes model to Claude CLI', async () => {
+      const expectedResult: ClaudeRunResult = {
+        result: 'Response from Opus',
+        sessionId: undefined,
+        rawOutput: '{"result":"Response from Opus"}',
+      };
+      mockRunClaude.mockResolvedValueOnce(expectedResult);
+
+      await request(app)
+        .post('/v1/chat/completions')
+        .set('Authorization', authHeader)
+        .send({
+          model: 'opus',
+          messages: [{ role: 'user', content: 'Hello' }],
+        });
+
+      // Verify the model was passed to runClaude
+      expect(mockRunClaude).toHaveBeenCalledOnce();
+      const callArgs = mockRunClaude.mock.calls[0][0];
+      expect(callArgs.model).toBe('opus');
+    });
+
+    it('accepts any model string and passes it through', async () => {
+      const expectedResult: ClaudeRunResult = {
+        result: 'Response',
+        sessionId: undefined,
+        rawOutput: '{"result":"Response"}',
+      };
+      mockRunClaude.mockResolvedValueOnce(expectedResult);
+
+      // User can specify full model name or alias
+      await request(app)
+        .post('/v1/chat/completions')
+        .set('Authorization', authHeader)
+        .send({
+          model: 'claude-sonnet-4-20250514',
+          messages: [{ role: 'user', content: 'Hello' }],
+        });
+
+      const callArgs = mockRunClaude.mock.calls[0][0];
+      expect(callArgs.model).toBe('claude-sonnet-4-20250514');
+    });
   });
 });
