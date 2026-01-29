@@ -1,0 +1,315 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-01-29T00:00:00.000Z",
+  "__export_source": "insomnia.desktop.app:v2023.5.8",
+  "resources": [
+    {
+      "_id": "wrk_claude_code_proxy",
+      "_type": "workspace",
+      "name": "Claude Code Proxy",
+      "description": "API collection for testing Claude Code Proxy endpoints",
+      "scope": "collection"
+    },
+    {
+      "_id": "env_base",
+      "_type": "environment",
+      "parentId": "wrk_claude_code_proxy",
+      "name": "Base Environment",
+      "data": {
+        "base_url": "http://localhost:3000",
+        "api_key": "your-api-key-here"
+      }
+    },
+    {
+      "_id": "fld_health",
+      "_type": "request_group",
+      "parentId": "wrk_claude_code_proxy",
+      "name": "Health"
+    },
+    {
+      "_id": "fld_api",
+      "_type": "request_group",
+      "parentId": "wrk_claude_code_proxy",
+      "name": "Custom API (/api)"
+    },
+    {
+      "_id": "fld_sessions",
+      "_type": "request_group",
+      "parentId": "wrk_claude_code_proxy",
+      "name": "Sessions"
+    },
+    {
+      "_id": "fld_openai",
+      "_type": "request_group",
+      "parentId": "wrk_claude_code_proxy",
+      "name": "OpenAI Compatible (/v1)"
+    },
+    {
+      "_id": "req_health",
+      "_type": "request",
+      "parentId": "fld_health",
+      "name": "Health Check",
+      "description": "Check server health, queue stats, and session stats",
+      "method": "GET",
+      "url": "{{ _.base_url }}/health",
+      "headers": [],
+      "body": {}
+    },
+    {
+      "_id": "req_api_run_simple",
+      "_type": "request",
+      "parentId": "fld_api",
+      "name": "Run - Simple Prompt",
+      "description": "Basic prompt execution",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/run",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.api_key }}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"prompt\": \"What is 2 + 2?\"\n}"
+      }
+    },
+    {
+      "_id": "req_api_run_with_model",
+      "_type": "request",
+      "parentId": "fld_api",
+      "name": "Run - With Model Selection",
+      "description": "Specify which Claude model to use (opus, sonnet, haiku)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/run",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.api_key }}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"prompt\": \"Write a haiku about coding\",\n  \"model\": \"haiku\"\n}"
+      }
+    },
+    {
+      "_id": "req_api_run_with_tools",
+      "_type": "request",
+      "parentId": "fld_api",
+      "name": "Run - With Allowed Tools",
+      "description": "Restrict which tools Claude can use",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/run",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.api_key }}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"prompt\": \"List files in the current directory\",\n  \"allowedTools\": [\"Bash\", \"Read\"]\n}"
+      }
+    },
+    {
+      "_id": "req_api_run_with_session",
+      "_type": "request",
+      "parentId": "fld_api",
+      "name": "Run - Continue Session",
+      "description": "Continue an existing conversation (replace sessionId with actual value)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/run",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.api_key }}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"prompt\": \"What did I just ask you?\",\n  \"sessionId\": \"replace-with-session-id-from-previous-response\"\n}"
+      }
+    },
+    {
+      "_id": "req_sessions_list",
+      "_type": "request",
+      "parentId": "fld_sessions",
+      "name": "List Sessions",
+      "description": "List all active sessions for your API key",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/sessions",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.api_key }}"
+        }
+      ],
+      "body": {}
+    },
+    {
+      "_id": "req_sessions_delete",
+      "_type": "request",
+      "parentId": "fld_sessions",
+      "name": "Delete Session",
+      "description": "Delete a specific session (replace :id with actual session ID)",
+      "method": "DELETE",
+      "url": "{{ _.base_url }}/api/sessions/:id",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.api_key }}"
+        }
+      ],
+      "body": {}
+    },
+    {
+      "_id": "req_openai_models",
+      "_type": "request",
+      "parentId": "fld_openai",
+      "name": "List Models",
+      "description": "Get available Claude models (OpenAI-compatible)",
+      "method": "GET",
+      "url": "{{ _.base_url }}/v1/models",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.api_key }}"
+        }
+      ],
+      "body": {}
+    },
+    {
+      "_id": "req_openai_chat_simple",
+      "_type": "request",
+      "parentId": "fld_openai",
+      "name": "Chat Completion - Simple",
+      "description": "Basic chat completion with single message",
+      "method": "POST",
+      "url": "{{ _.base_url }}/v1/chat/completions",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.api_key }}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"model\": \"sonnet\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Hello! What can you help me with?\"\n    }\n  ]\n}"
+      }
+    },
+    {
+      "_id": "req_openai_chat_with_system",
+      "_type": "request",
+      "parentId": "fld_openai",
+      "name": "Chat Completion - With System Prompt",
+      "description": "Chat completion with system message for context",
+      "method": "POST",
+      "url": "{{ _.base_url }}/v1/chat/completions",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.api_key }}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"model\": \"sonnet\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a helpful coding assistant. Be concise.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"How do I reverse a string in Python?\"\n    }\n  ]\n}"
+      }
+    },
+    {
+      "_id": "req_openai_chat_conversation",
+      "_type": "request",
+      "parentId": "fld_openai",
+      "name": "Chat Completion - Multi-turn",
+      "description": "Multi-turn conversation with history",
+      "method": "POST",
+      "url": "{{ _.base_url }}/v1/chat/completions",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.api_key }}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"model\": \"sonnet\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"My name is Alice\"\n    },\n    {\n      \"role\": \"assistant\",\n      \"content\": \"Hello Alice! Nice to meet you.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"What is my name?\"\n    }\n  ]\n}"
+      }
+    },
+    {
+      "_id": "req_openai_chat_opus",
+      "_type": "request",
+      "parentId": "fld_openai",
+      "name": "Chat Completion - Opus Model",
+      "description": "Use the most capable Opus model",
+      "method": "POST",
+      "url": "{{ _.base_url }}/v1/chat/completions",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.api_key }}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"model\": \"opus\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Explain quantum entanglement in simple terms\"\n    }\n  ]\n}"
+      }
+    },
+    {
+      "_id": "req_openai_chat_haiku",
+      "_type": "request",
+      "parentId": "fld_openai",
+      "name": "Chat Completion - Haiku Model",
+      "description": "Use the fast Haiku model for quick responses",
+      "method": "POST",
+      "url": "{{ _.base_url }}/v1/chat/completions",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.api_key }}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"model\": \"haiku\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"What is 15 * 23?\"\n    }\n  ]\n}"
+      }
+    }
+  ]
+}
