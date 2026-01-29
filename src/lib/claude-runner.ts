@@ -24,7 +24,12 @@ export async function runClaude(
   options: ClaudeRunOptions,
   logger: Logger
 ): Promise<ClaudeRunResult> {
-  const { prompt, allowedTools, workingDirectory, timeoutMs = DEFAULT_TIMEOUT_MS, resumeSessionId } = options;
+  const { prompt, allowedTools, workingDirectory, timeoutMs = DEFAULT_TIMEOUT_MS, resumeSessionId, abortSignal } = options;
+
+  // Check if already aborted
+  if (abortSignal?.aborted) {
+    throw Errors.cliError('Request was aborted', { reason: 'aborted_before_start' });
+  }
 
   // Build command arguments
   const args: string[] = ['-p', prompt, '--output-format', 'json'];
@@ -47,6 +52,7 @@ export async function runClaude(
     let stdout = '';
     let stderr = '';
     let killed = false;
+    let aborted = false;
     let child: ChildProcess;
 
     try {
@@ -77,6 +83,26 @@ export async function runClaude(
       }, KILL_GRACE_PERIOD_MS);
     }, timeoutMs);
 
+    // Handle abort signal (client disconnect)
+    const abortHandler = () => {
+      if (!child.killed) {
+        aborted = true;
+        logger.info('Request aborted, killing Claude CLI process');
+        child.kill('SIGTERM');
+
+        // Force kill after grace period
+        setTimeout(() => {
+          if (!child.killed) {
+            child.kill('SIGKILL');
+          }
+        }, KILL_GRACE_PERIOD_MS);
+      }
+    };
+
+    if (abortSignal) {
+      abortSignal.addEventListener('abort', abortHandler, { once: true });
+    }
+
     // Collect stdout
     child.stdout?.on('data', (chunk: Buffer) => {
       stdout += chunk.toString();
@@ -102,7 +128,18 @@ export async function runClaude(
     child.on('close', (code, signal) => {
       clearTimeout(timeout);
 
-      logger.debug('Claude CLI exited', { code, signal, killed });
+      // Clean up abort listener
+      if (abortSignal) {
+        abortSignal.removeEventListener('abort', abortHandler);
+      }
+
+      logger.debug('Claude CLI exited', { code, signal, killed, aborted });
+
+      // Handle abort
+      if (aborted) {
+        reject(Errors.cliError('Request was aborted', { reason: 'client_disconnect' }));
+        return;
+      }
 
       // Handle timeout kill
       if (killed) {

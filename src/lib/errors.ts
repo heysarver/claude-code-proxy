@@ -18,6 +18,10 @@ export const ErrorCodes = {
   INVALID_REQUEST: 'invalid_request',
   /** Internal server error */
   INTERNAL_ERROR: 'internal_error',
+  /** Queue is full (Phase 2) */
+  QUEUE_FULL: 'queue_full',
+  /** Request waited too long in queue (Phase 2) */
+  QUEUE_TIMEOUT: 'queue_timeout',
 } as const;
 
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];
@@ -85,4 +89,10 @@ export const Errors = {
 
   internalError: (message: string = 'An unexpected error occurred') =>
     new ApiError(500, ErrorCodes.INTERNAL_ERROR, message),
+
+  queueFull: (maxSize: number) =>
+    new ApiError(429, ErrorCodes.QUEUE_FULL, `Server is at capacity. Maximum queue size (${maxSize}) reached.`),
+
+  queueTimeout: (timeoutMs: number) =>
+    new ApiError(504, ErrorCodes.QUEUE_TIMEOUT, `Request waited too long in queue (${timeoutMs}ms)`),
 };
