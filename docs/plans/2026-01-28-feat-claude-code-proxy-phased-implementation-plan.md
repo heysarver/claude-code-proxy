@@ -169,13 +169,13 @@ claude-code-proxy/
 
 #### Acceptance Criteria
 
-- [ ] Configurable worker pool (default: 2 workers)
-- [ ] Request queue with p-queue library
-- [ ] Maximum queue depth with 429 response when exceeded
-- [ ] Request timeout applies to queue wait + processing
-- [ ] Queue metrics in health endpoint
-- [ ] Request ID tracking through entire lifecycle
-- [ ] Client disconnect detection (abort processing option)
+- [x] Configurable worker pool (default: 2 workers)
+- [x] Request queue with p-queue library
+- [x] Maximum queue depth with 429 response when exceeded
+- [x] Request timeout applies to queue wait + processing
+- [x] Queue metrics in health endpoint
+- [x] Request ID tracking through entire lifecycle
+- [x] Client disconnect detection (abort processing option)
 
 #### Technical Specification
 
