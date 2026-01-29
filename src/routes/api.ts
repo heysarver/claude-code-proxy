@@ -90,6 +90,7 @@ export function createApiRouter(
 
     logger.debug('Submitting to worker pool', {
       requestId,
+      model: body.model,
       promptLength: body.prompt.length,
       allowedTools: body.allowedTools,
       workingDirectory: body.workingDirectory,
@@ -112,6 +113,7 @@ export function createApiRouter(
       const result = await workerPool.submit(
         {
           prompt: body.prompt,
+          model: body.model,
           allowedTools: body.allowedTools,
           workingDirectory: body.workingDirectory,
           resumeSessionId,

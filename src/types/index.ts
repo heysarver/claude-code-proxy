@@ -4,6 +4,8 @@
 export interface RunRequest {
   /** The prompt to send to Claude Code */
   prompt: string;
+  /** Optional model to use (e.g., 'opus', 'sonnet', 'haiku') */
+  model?: string;
   /** Optional list of tools to allow (passed to --allowedTools) */
   allowedTools?: string[];
   /** Optional working directory for Claude Code execution */
@@ -100,6 +102,8 @@ export interface ClaudeRunResult {
 export interface ClaudeRunOptions {
   /** The prompt to send */
   prompt: string;
+  /** Model to use (e.g., 'opus', 'sonnet', 'haiku') */
+  model?: string;
   /** Tools to allow */
   allowedTools?: string[];
   /** Working directory */

@@ -102,6 +102,7 @@ export function createOpenAIRouter(
 
     logger.debug('Converted messages to prompt', {
       requestId,
+      model: body.model,
       messageCount: body.messages.length,
       promptLength: prompt.length,
     });
@@ -116,10 +117,11 @@ export function createOpenAIRouter(
     req.on('close', onClose);
 
     try {
-      // Submit to worker pool
+      // Submit to worker pool with model selection
       const result = await workerPool.submit(
         {
           prompt,
+          model: body.model,
           abortSignal: abortController.signal,
         },
         requestId
