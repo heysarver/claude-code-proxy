@@ -25,6 +25,7 @@ const mockConfig: Config = {
   maxSessionsPerKey: 10,
   sessionCleanupIntervalMs: 60000,
   sessionDbPath: ':memory:',
+  defaultWorkspaceDir: '/tmp/test-workspace',
 };
 
 // Mock logger
@@ -93,7 +94,8 @@ describe('WorkerPool', () => {
           abortSignal: abortController.signal,
           timeoutMs: mockConfig.requestTimeoutMs,
         }),
-        mockLogger
+        mockLogger,
+        mockConfig
       );
     });
 

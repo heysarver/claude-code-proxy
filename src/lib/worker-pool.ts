@@ -142,7 +142,8 @@ export class WorkerPool {
 
           return runClaude(
             { ...options, timeoutMs: remainingTimeoutMs },
-            this.logger
+            this.logger,
+            this.config
           );
         }
       );

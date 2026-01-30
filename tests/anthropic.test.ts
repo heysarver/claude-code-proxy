@@ -30,6 +30,7 @@ const mockConfig: Config = {
   maxSessionsPerKey: 10,
   sessionCleanupIntervalMs: 60000,
   sessionDbPath: ':memory:',
+  defaultWorkspaceDir: '/tmp/test-workspace',
 };
 
 // Mock logger
