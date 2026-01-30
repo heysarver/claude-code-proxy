@@ -32,6 +32,15 @@ export async function runClaude(
   // Apply default workspace directory if none provided
   const effectiveWorkDir = workingDirectory || config.defaultWorkspaceDir;
 
+  // Apply default model if none provided (normalize to lowercase)
+  const effectiveModel = (model || config.defaultModel).toLowerCase();
+  const usingDefaultModel = !model;
+  logger.debug('Model selection', {
+    requestedModel: model || '(none)',
+    effectiveModel,
+    source: usingDefaultModel ? 'default' : 'request',
+  });
+
   // Validate against path traversal
   if (effectiveWorkDir && effectiveWorkDir.includes('..')) {
     throw Errors.invalidRequest(`Invalid working directory path: contains path traversal`);
@@ -61,9 +70,8 @@ export async function runClaude(
   const outputFormat = stream ? 'stream-json' : 'json';
   const args: string[] = ['-p', prompt, '--output-format', outputFormat, '--dangerously-skip-permissions'];
 
-  if (model) {
-    args.push('--model', model);
-  }
+  // Always include model flag since we have an effective model (either provided or default)
+  args.push('--model', effectiveModel);
 
   if (allowedTools && allowedTools.length > 0) {
     args.push('--allowedTools', allowedTools.join(','));
@@ -250,7 +258,7 @@ export async function runClaude(
 
       // Parse successful output
       try {
-        const result = parseClaudeOutput(stdout, logger);
+        const result = parseClaudeOutput(stdout, logger, effectiveModel);
         resolve(result);
       } catch (err) {
         reject(Errors.cliError('Failed to parse Claude CLI output', {
@@ -268,7 +276,7 @@ export async function runClaude(
  * Claude --output-format json returns structured output.
  * We need to extract the text content from the response.
  */
-function parseClaudeOutput(output: string, logger: Logger): ClaudeRunResult {
+function parseClaudeOutput(output: string, logger: Logger, effectiveModel: string): ClaudeRunResult {
   // Claude CLI with --output-format json returns the full response
   // The structure includes session_id and the result text
   const trimmed = output.trim();
@@ -304,6 +312,7 @@ function parseClaudeOutput(output: string, logger: Logger): ClaudeRunResult {
       result,
       sessionId,
       rawOutput: trimmed,
+      model: effectiveModel,
     };
   } catch (err) {
     // If not valid JSON, might be plain text output or error message
@@ -313,6 +322,7 @@ function parseClaudeOutput(output: string, logger: Logger): ClaudeRunResult {
       result: trimmed,
       sessionId: undefined,
       rawOutput: trimmed,
+      model: effectiveModel,
     };
   }
 }

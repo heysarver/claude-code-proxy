@@ -178,6 +178,7 @@ server.listen(config.port, () => {
   logger.info(`Claude Code Proxy listening on port ${config.port}`, {
     nodeVersion: process.version,
     logLevel: config.logLevel,
+    defaultModel: config.defaultModel,
     workerConcurrency: config.workerConcurrency,
     maxQueueSize: config.maxQueueSize,
     sessionTtlMs: config.sessionTtlMs,

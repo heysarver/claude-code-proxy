@@ -28,6 +28,8 @@ export interface Config {
   sessionDbPath: string;
   /** Default working directory for Claude CLI execution */
   defaultWorkspaceDir: string;
+  /** Default model for Claude CLI (opus, sonnet, haiku) */
+  defaultModel: string;
 }
 
 /**
@@ -46,6 +48,7 @@ export function loadConfig(): Config {
   const sessionCleanupIntervalMs = parseInt(process.env.SESSION_CLEANUP_INTERVAL_MS || '60000', 10);
   const sessionDbPath = process.env.SESSION_DB_PATH || './data/sessions.db';
   const defaultWorkspaceDir = process.env.DEFAULT_WORKSPACE_DIR || `${homedir()}/claudewksp`;
+  const defaultModel = (process.env.DEFAULT_MODEL || 'haiku').toLowerCase();
 
   // Validation
   if (!proxyApiKey) {
@@ -92,6 +95,11 @@ export function loadConfig(): Config {
     throw new Error('DEFAULT_WORKSPACE_DIR cannot contain path traversal (..)');
   }
 
+  const validModels = ['opus', 'sonnet', 'haiku'];
+  if (!validModels.includes(defaultModel)) {
+    throw new Error(`DEFAULT_MODEL must be one of: ${validModels.join(', ')}`);
+  }
+
   return {
     port,
     proxyApiKey,
@@ -105,6 +113,7 @@ export function loadConfig(): Config {
     sessionCleanupIntervalMs,
     sessionDbPath,
     defaultWorkspaceDir,
+    defaultModel,
   };
 }
 

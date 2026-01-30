@@ -32,6 +32,8 @@ export const ErrorCodes = {
   MEMORY_ERROR: 'memory_error',
   /** Task not found (Phase 6) */
   TASK_NOT_FOUND: 'task_not_found',
+  /** Invalid model specified */
+  INVALID_MODEL: 'invalid_model',
 } as const;
 
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];
@@ -120,6 +122,9 @@ export const Errors = {
 
   taskNotFound: (taskId: string) =>
     new ApiError(404, ErrorCodes.TASK_NOT_FOUND, `Task not found: ${taskId}`),
+
+  invalidModel: (model: string) =>
+    new ApiError(400, ErrorCodes.INVALID_MODEL, `Invalid model: ${model}. Must be one of: opus, sonnet, haiku`),
 };
 
 /**

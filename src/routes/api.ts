@@ -79,6 +79,18 @@ export function createApiRouter(
       }
     }
 
+    // Validate model if provided
+    const validModels = ['opus', 'sonnet', 'haiku'];
+    if (body.model !== undefined && body.model !== null && body.model !== '') {
+      if (typeof body.model !== 'string') {
+        throw Errors.invalidRequest('model must be a string');
+      }
+      const normalizedModel = body.model.toLowerCase();
+      if (!validModels.includes(normalizedModel)) {
+        throw Errors.invalidModel(body.model);
+      }
+    }
+
     // Look up existing session if provided
     let existingSession = null;
     let resumeSessionId: string | undefined;
@@ -158,6 +170,7 @@ export function createApiRouter(
         result: result.result,
         sessionId: responseSessionId,
         durationMs,
+        model: result.model,
       };
 
       res.json(response);

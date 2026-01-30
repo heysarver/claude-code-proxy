@@ -28,6 +28,8 @@ export interface RunResponse {
   sessionId?: string;
   /** Processing time in milliseconds */
   durationMs: number;
+  /** The effective model used for this request */
+  model: string;
 }
 
 /**
@@ -96,6 +98,8 @@ export interface ClaudeRunResult {
   sessionId?: string;
   /** Raw JSON output from Claude CLI */
   rawOutput: string;
+  /** The effective model used for this request */
+  model: string;
 }
 
 /**
