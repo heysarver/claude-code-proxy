@@ -1,7 +1,7 @@
 {
   "_type": "export",
   "__export_format": 4,
-  "__export_date": "2026-01-29T00:00:00.000Z",
+  "__export_date": "2026-01-30T00:00:00.000Z",
   "__export_source": "insomnia.desktop.app:v2023.5.8",
   "resources": [
     {
@@ -333,6 +333,90 @@
         "mimeType": "application/json",
         "text": "{\n  \"model\": \"sonnet\",\n  \"stream\": true,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Write a short poem about programming\"\n    }\n  ]\n}"
       }
+    },
+    {
+      "_id": "fld_tasks",
+      "_type": "request_group",
+      "parentId": "wrk_claude_code_proxy",
+      "name": "Background Tasks"
+    },
+    {
+      "_id": "req_tasks_submit",
+      "_type": "request",
+      "parentId": "fld_tasks",
+      "name": "Submit Task",
+      "description": "Submit a prompt as a background task, returns immediately with taskId (HTTP 202)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/tasks",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.api_key }}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"prompt\": \"What is the capital of France?\"\n}"
+      }
+    },
+    {
+      "_id": "req_tasks_submit_full",
+      "_type": "request",
+      "parentId": "fld_tasks",
+      "name": "Submit Task - Full Options",
+      "description": "Submit task with all available options (model, tools, workingDirectory, sessionId, maxTurns)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/tasks",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.api_key }}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"prompt\": \"List files in the current directory\",\n  \"model\": \"sonnet\",\n  \"allowedTools\": [\"Bash\", \"Read\"],\n  \"workingDirectory\": \"/tmp\",\n  \"maxTurns\": 5\n}"
+      }
+    },
+    {
+      "_id": "req_tasks_get",
+      "_type": "request",
+      "parentId": "fld_tasks",
+      "name": "Get Task Status",
+      "description": "Poll for task status and results (replace :id with actual taskId)",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/tasks/:id",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.api_key }}"
+        }
+      ],
+      "body": {}
+    },
+    {
+      "_id": "req_tasks_cancel",
+      "_type": "request",
+      "parentId": "fld_tasks",
+      "name": "Cancel Task",
+      "description": "Cancel a running task (replace :id with actual taskId)",
+      "method": "DELETE",
+      "url": "{{ _.base_url }}/api/tasks/:id",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.api_key }}"
+        }
+      ],
+      "body": {}
     },
     {
       "_id": "fld_anthropic",
