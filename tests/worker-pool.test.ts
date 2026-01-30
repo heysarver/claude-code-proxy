@@ -24,6 +24,7 @@ const mockConfig: Config = {
   sessionTtlMs: 3600000,
   maxSessionsPerKey: 10,
   sessionCleanupIntervalMs: 60000,
+  sessionDbPath: ':memory:',
 };
 
 // Mock logger

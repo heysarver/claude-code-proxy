@@ -22,6 +22,8 @@ export interface Config {
   maxSessionsPerKey: number;
   /** Session cleanup interval in milliseconds (Phase 3) */
   sessionCleanupIntervalMs: number;
+  /** Path to SQLite database file for session persistence */
+  sessionDbPath: string;
 }
 
 /**
@@ -38,6 +40,7 @@ export function loadConfig(): Config {
   const sessionTtlMs = parseInt(process.env.SESSION_TTL_MS || '3600000', 10);
   const maxSessionsPerKey = parseInt(process.env.MAX_SESSIONS_PER_KEY || '10', 10);
   const sessionCleanupIntervalMs = parseInt(process.env.SESSION_CLEANUP_INTERVAL_MS || '60000', 10);
+  const sessionDbPath = process.env.SESSION_DB_PATH || './data/sessions.db';
 
   // Validation
   if (!proxyApiKey) {
@@ -91,6 +94,7 @@ export function loadConfig(): Config {
     sessionTtlMs,
     maxSessionsPerKey,
     sessionCleanupIntervalMs,
+    sessionDbPath,
   };
 }
 

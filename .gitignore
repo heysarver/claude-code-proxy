@@ -34,4 +34,7 @@ temp/
 
 .claude/settings.local.json
 docs/
+
+# Session database
+data/
 sessions.db

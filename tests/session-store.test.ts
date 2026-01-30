@@ -3,7 +3,7 @@ import { SessionStore } from '../src/lib/session-store.js';
 import { Errors } from '../src/lib/errors.js';
 import type { Config, Logger } from '../src/config.js';
 
-// Mock config
+// Mock config with in-memory SQLite database
 const mockConfig: Config = {
   port: 6789,
   proxyApiKey: 'test-api-key',
@@ -15,6 +15,7 @@ const mockConfig: Config = {
   sessionTtlMs: 3600000, // 1 hour
   maxSessionsPerKey: 3,
   sessionCleanupIntervalMs: 60000,
+  sessionDbPath: ':memory:',
 };
 
 // Mock logger
@@ -259,6 +260,7 @@ describe('SessionStore', () => {
         ...mockConfig,
         sessionTtlMs: 50, // 50ms TTL
         sessionCleanupIntervalMs: 25, // 25ms cleanup interval
+        sessionDbPath: ':memory:',
       };
       const shortTtlStore = new SessionStore(shortTtlConfig, mockLogger);
       shortTtlStore.startCleanup();

@@ -1,22 +1,84 @@
 import { createHash } from 'node:crypto';
 import { v4 as uuidv4 } from 'uuid';
+import type Database from 'better-sqlite3';
 import type { Session, SessionInfo } from '../types/index.js';
 import type { Config, Logger } from '../config.js';
 import { Errors } from './errors.js';
+import { createDatabase } from './database.js';
+
+// Database row types
+interface SessionRow {
+  id: string;
+  claude_session_id: string;
+  api_key_hash: string;
+  created_at: string;
+  last_accessed_at: string;
+}
+
+interface CountRow {
+  count: number;
+}
 
 /**
- * In-memory session store with TTL cleanup and per-API-key isolation
+ * SQLite-backed session store with TTL cleanup and per-API-key isolation
  */
 export class SessionStore {
-  private sessions = new Map<string, Session>();
+  private db: Database.Database;
   private sessionQueues = new Map<string, (() => void)[]>();
   private cleanupTimer: ReturnType<typeof setInterval> | null = null;
   private config: Config;
   private logger: Logger;
 
+  // Prepared statements
+  private stmtInsert: Database.Statement;
+  private stmtGetById: Database.Statement;
+  private stmtUpdateLastAccessed: Database.Statement;
+  private stmtDelete: Database.Statement;
+  private stmtListByApiKey: Database.Statement;
+  private stmtCountByApiKey: Database.Statement;
+  private stmtCleanupExpired: Database.Statement;
+  private stmtCountAll: Database.Statement;
+
   constructor(config: Config, logger: Logger) {
     this.config = config;
     this.logger = logger;
+
+    // Initialize database
+    this.db = createDatabase(config.sessionDbPath, logger);
+
+    // Prepare statements once for performance
+    this.stmtInsert = this.db.prepare(`
+      INSERT INTO sessions (id, claude_session_id, api_key_hash, created_at, last_accessed_at)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+
+    this.stmtGetById = this.db.prepare(`
+      SELECT * FROM sessions WHERE id = ?
+    `);
+
+    this.stmtUpdateLastAccessed = this.db.prepare(`
+      UPDATE sessions SET last_accessed_at = ? WHERE id = ?
+    `);
+
+    this.stmtDelete = this.db.prepare(`
+      DELETE FROM sessions WHERE id = ?
+    `);
+
+    this.stmtListByApiKey = this.db.prepare(`
+      SELECT id, created_at, last_accessed_at FROM sessions WHERE api_key_hash = ?
+    `);
+
+    this.stmtCountByApiKey = this.db.prepare(`
+      SELECT COUNT(*) as count FROM sessions WHERE api_key_hash = ?
+    `);
+
+    this.stmtCleanupExpired = this.db.prepare(`
+      DELETE FROM sessions WHERE last_accessed_at < ?
+    `);
+
+    this.stmtCountAll = this.db.prepare(`
+      SELECT COUNT(*) as count FROM sessions
+    `);
   }
 
   /**
@@ -54,35 +116,55 @@ export class SessionStore {
   }
 
   /**
+   * Convert database row to Session object
+   */
+  private rowToSession(row: SessionRow): Session {
+    return {
+      id: row.id,
+      claudeSessionId: row.claude_session_id,
+      apiKeyHash: row.api_key_hash,
+      createdAt: new Date(row.created_at),
+      lastAccessedAt: new Date(row.last_accessed_at),
+      locked: this.sessionQueues.has(row.id), // Derive from runtime state
+    };
+  }
+
+  /**
    * Create a new session
    */
   createSession(claudeSessionId: string, apiKey: string): Session {
     const apiKeyHash = this.hashApiKey(apiKey);
 
     // Check per-key limit
-    const existingSessions = this.getSessionsForApiKey(apiKeyHash);
-    if (existingSessions.length >= this.config.maxSessionsPerKey) {
+    const countRow = this.stmtCountByApiKey.get(apiKeyHash) as CountRow;
+    if (countRow.count >= this.config.maxSessionsPerKey) {
       this.logger.warn('Session limit reached for API key', {
         limit: this.config.maxSessionsPerKey,
-        existing: existingSessions.length,
+        existing: countRow.count,
       });
       throw Errors.sessionLimitReached(this.config.maxSessionsPerKey);
     }
 
+    const now = new Date();
     const session: Session = {
       id: uuidv4(),
       claudeSessionId,
       apiKeyHash,
-      createdAt: new Date(),
-      lastAccessedAt: new Date(),
+      createdAt: now,
+      lastAccessedAt: now,
       locked: false,
     };
 
-    this.sessions.set(session.id, session);
+    this.stmtInsert.run(
+      session.id,
+      session.claudeSessionId,
+      session.apiKeyHash,
+      session.createdAt.toISOString(),
+      session.lastAccessedAt.toISOString()
+    );
 
     this.logger.debug('Session created', {
       sessionId: session.id,
-      totalSessions: this.sessions.size,
     });
 
     return session;
@@ -92,27 +174,24 @@ export class SessionStore {
    * Get a session by ID, validating ownership
    */
   getSession(sessionId: string, apiKey: string): Session | null {
-    const session = this.sessions.get(sessionId);
-    if (!session) return null;
+    const row = this.stmtGetById.get(sessionId) as SessionRow | undefined;
+    if (!row) return null;
 
     // Validate ownership
     const apiKeyHash = this.hashApiKey(apiKey);
-    if (session.apiKeyHash !== apiKeyHash) {
+    if (row.api_key_hash !== apiKeyHash) {
       this.logger.warn('Session access denied - wrong API key', { sessionId });
       return null;
     }
 
-    return session;
+    return this.rowToSession(row);
   }
 
   /**
    * Update session's last accessed time
    */
   touchSession(sessionId: string): void {
-    const session = this.sessions.get(sessionId);
-    if (session) {
-      session.lastAccessedAt = new Date();
-    }
+    this.stmtUpdateLastAccessed.run(new Date().toISOString(), sessionId);
   }
 
   /**
@@ -120,21 +199,22 @@ export class SessionStore {
    * Returns a promise that resolves when the lock is acquired
    */
   async acquireLock(sessionId: string): Promise<void> {
-    const session = this.sessions.get(sessionId);
-    if (!session) {
+    const row = this.stmtGetById.get(sessionId) as SessionRow | undefined;
+    if (!row) {
       throw Errors.sessionNotFound(sessionId);
     }
 
-    if (!session.locked) {
-      session.locked = true;
+    // Check if session is currently locked (has active queue)
+    const queue = this.sessionQueues.get(sessionId);
+    if (!queue || queue.length === 0) {
+      // Not locked, create empty queue to mark as locked
+      this.sessionQueues.set(sessionId, []);
       return;
     }
 
     // Session is locked, queue up and wait
     return new Promise((resolve) => {
-      const queue = this.sessionQueues.get(sessionId) || [];
       queue.push(resolve);
-      this.sessionQueues.set(sessionId, queue);
 
       this.logger.debug('Request queued for locked session', {
         sessionId,
@@ -147,22 +227,17 @@ export class SessionStore {
    * Release a lock on a session
    */
   releaseLock(sessionId: string): void {
-    const session = this.sessions.get(sessionId);
-    if (!session) return;
-
-    // Check if there are queued requests
     const queue = this.sessionQueues.get(sessionId);
-    if (queue && queue.length > 0) {
+    if (!queue) return;
+
+    if (queue.length > 0) {
       // Give lock to next in queue
       const next = queue.shift()!;
-      if (queue.length === 0) {
-        this.sessionQueues.delete(sessionId);
-      }
       this.logger.debug('Session lock passed to queued request', { sessionId });
       next(); // Resolve their promise
     } else {
-      // No one waiting, just unlock
-      session.locked = false;
+      // No one waiting, remove the lock
+      this.sessionQueues.delete(sessionId);
     }
   }
 
@@ -176,7 +251,7 @@ export class SessionStore {
     // Clear any pending queue for this session
     this.sessionQueues.delete(sessionId);
 
-    this.sessions.delete(sessionId);
+    this.stmtDelete.run(sessionId);
     this.logger.debug('Session deleted', { sessionId });
     return true;
   }
@@ -186,49 +261,29 @@ export class SessionStore {
    */
   listSessions(apiKey: string): SessionInfo[] {
     const apiKeyHash = this.hashApiKey(apiKey);
-    return this.getSessionsForApiKey(apiKeyHash).map((session) => ({
-      id: session.id,
-      createdAt: session.createdAt.toISOString(),
-      lastAccessedAt: session.lastAccessedAt.toISOString(),
-    }));
-  }
+    const rows = this.stmtListByApiKey.all(apiKeyHash) as Array<{
+      id: string;
+      created_at: string;
+      last_accessed_at: string;
+    }>;
 
-  /**
-   * Get sessions for an API key hash (internal)
-   */
-  private getSessionsForApiKey(apiKeyHash: string): Session[] {
-    const sessions: Session[] = [];
-    for (const session of this.sessions.values()) {
-      if (session.apiKeyHash === apiKeyHash) {
-        sessions.push(session);
-      }
-    }
-    return sessions;
+    return rows.map((row) => ({
+      id: row.id,
+      createdAt: row.created_at,
+      lastAccessedAt: row.last_accessed_at,
+    }));
   }
 
   /**
    * Clean up expired sessions
    */
   private cleanupExpiredSessions(): void {
-    const now = Date.now();
-    const expiredIds: string[] = [];
+    const cutoff = new Date(Date.now() - this.config.sessionTtlMs).toISOString();
+    const result = this.stmtCleanupExpired.run(cutoff);
 
-    for (const [id, session] of this.sessions) {
-      const age = now - session.lastAccessedAt.getTime();
-      if (age > this.config.sessionTtlMs) {
-        expiredIds.push(id);
-      }
-    }
-
-    for (const id of expiredIds) {
-      this.sessionQueues.delete(id);
-      this.sessions.delete(id);
-    }
-
-    if (expiredIds.length > 0) {
+    if (result.changes > 0) {
       this.logger.info('Expired sessions cleaned up', {
-        count: expiredIds.length,
-        remaining: this.sessions.size,
+        count: result.changes,
       });
     }
   }
@@ -237,13 +292,10 @@ export class SessionStore {
    * Get store statistics
    */
   getStats(): { totalSessions: number; lockedSessions: number } {
-    let lockedSessions = 0;
-    for (const session of this.sessions.values()) {
-      if (session.locked) lockedSessions++;
-    }
+    const countRow = this.stmtCountAll.get() as CountRow;
     return {
-      totalSessions: this.sessions.size,
-      lockedSessions,
+      totalSessions: countRow.count,
+      lockedSessions: this.sessionQueues.size,
     };
   }
 
@@ -252,8 +304,8 @@ export class SessionStore {
    */
   shutdown(): void {
     this.stopCleanup();
-    this.sessions.clear();
     this.sessionQueues.clear();
+    this.db.close();
     this.logger.info('Session store shutdown complete');
   }
 }
