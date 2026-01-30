@@ -32,6 +32,11 @@ export async function runClaude(
   // Apply default workspace directory if none provided
   const effectiveWorkDir = workingDirectory || config.defaultWorkspaceDir;
 
+  // Validate against path traversal
+  if (effectiveWorkDir && effectiveWorkDir.includes('..')) {
+    throw Errors.invalidRequest(`Invalid working directory path: contains path traversal`);
+  }
+
   // Create workspace directory if it doesn't exist
   if (effectiveWorkDir && !existsSync(effectiveWorkDir)) {
     try {
