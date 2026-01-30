@@ -73,6 +73,12 @@ export function createApiRouter(
       throw Errors.invalidRequest('sessionId must be a string');
     }
 
+    if (body.maxTurns !== undefined) {
+      if (!Number.isInteger(body.maxTurns) || body.maxTurns < 1) {
+        throw Errors.invalidRequest('maxTurns must be a positive integer');
+      }
+    }
+
     // Look up existing session if provided
     let existingSession = null;
     let resumeSessionId: string | undefined;
@@ -120,6 +126,7 @@ export function createApiRouter(
           workingDirectory: body.workingDirectory,
           resumeSessionId,
           abortSignal: abortController.signal,
+          maxTurns: body.maxTurns,
         },
         requestId
       );

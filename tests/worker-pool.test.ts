@@ -410,6 +410,10 @@ describe('isRetryableError', () => {
     expect(isRetryableError(Errors.cliNotFound())).toBe(false);
   });
 
+  it('returns false for memory errors', () => {
+    expect(isRetryableError(Errors.memoryError())).toBe(false);
+  });
+
   it('returns true for ECONNRESET errors', () => {
     const error = new Error('read ECONNRESET');
     expect(isRetryableError(error)).toBe(true);

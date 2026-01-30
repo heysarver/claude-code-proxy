@@ -12,6 +12,8 @@ export interface RunRequest {
   workingDirectory?: string;
   /** Optional session ID to resume an existing conversation (Phase 3) */
   sessionId?: string;
+  /** Optional maximum agentic turns to prevent runaway loops */
+  maxTurns?: number;
 }
 
 /**
@@ -125,6 +127,8 @@ export interface ClaudeRunOptions {
   stream?: boolean;
   /** Callback for streaming chunks (Phase 5) */
   onChunk?: (chunk: StreamChunk) => void;
+  /** Maximum agentic turns. Prevents runaway loops. */
+  maxTurns?: number;
 }
 
 /**

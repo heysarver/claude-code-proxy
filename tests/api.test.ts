@@ -208,6 +208,64 @@ describe('Request Validation', () => {
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('invalid_request');
   });
+
+  it('rejects maxTurns that is not a positive integer', async () => {
+    // Test non-integer (float)
+    let res = await request(app)
+      .post('/api/run')
+      .set('Authorization', authHeader)
+      .send({ prompt: 'test', maxTurns: 3.5 });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('invalid_request');
+    expect(res.body.error.message).toContain('maxTurns');
+
+    // Test zero
+    res = await request(app)
+      .post('/api/run')
+      .set('Authorization', authHeader)
+      .send({ prompt: 'test', maxTurns: 0 });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('invalid_request');
+
+    // Test negative
+    res = await request(app)
+      .post('/api/run')
+      .set('Authorization', authHeader)
+      .send({ prompt: 'test', maxTurns: -5 });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('invalid_request');
+
+    // Test string
+    res = await request(app)
+      .post('/api/run')
+      .set('Authorization', authHeader)
+      .send({ prompt: 'test', maxTurns: 'five' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('invalid_request');
+  });
+
+  it('accepts valid maxTurns', async () => {
+    mockRunClaude.mockResolvedValueOnce({
+      result: 'done',
+      sessionId: undefined,
+      rawOutput: 'done',
+    });
+
+    const res = await request(app)
+      .post('/api/run')
+      .set('Authorization', authHeader)
+      .send({ prompt: 'test', maxTurns: 5 });
+
+    expect(res.status).toBe(200);
+    expect(mockRunClaude).toHaveBeenCalledWith(
+      expect.objectContaining({ maxTurns: 5 }),
+      mockLogger
+    );
+  });
 });
 
 describe('Worker Pool', () => {
@@ -391,5 +449,13 @@ describe('Error Classes', () => {
     expect(sessionLimit.statusCode).toBe(429);
     expect(sessionLimit.code).toBe('session_limit_reached');
     expect(sessionLimit.message).toContain('10');
+  });
+
+  it('Memory error factory creates correct error', () => {
+    const memoryError = Errors.memoryError({ exitCode: 1, hint: 'Try again' });
+    expect(memoryError.statusCode).toBe(500);
+    expect(memoryError.code).toBe('memory_error');
+    expect(memoryError.message).toContain('memory');
+    expect(memoryError.details).toEqual({ exitCode: 1, hint: 'Try again' });
   });
 });
