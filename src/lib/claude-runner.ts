@@ -27,7 +27,7 @@ export async function runClaude(
   logger: Logger,
   config: Config
 ): Promise<ClaudeRunResult> {
-  const { prompt, model, allowedTools, workingDirectory, timeoutMs = DEFAULT_TIMEOUT_MS, resumeSessionId, abortSignal, stream, onChunk } = options;
+  const { prompt, model, allowedTools, workingDirectory, timeoutMs = DEFAULT_TIMEOUT_MS, resumeSessionId, abortSignal, stream, onChunk, maxTurns } = options;
 
   // Apply default workspace directory if none provided
   const effectiveWorkDir = workingDirectory || config.defaultWorkspaceDir;
@@ -66,6 +66,10 @@ export async function runClaude(
 
   if (resumeSessionId) {
     args.push('--resume', resumeSessionId);
+  }
+
+  if (maxTurns && maxTurns > 0) {
+    args.push('--max-turns', String(maxTurns));
   }
 
   logger.debug('Spawning Claude CLI', {
@@ -217,6 +221,17 @@ export async function runClaude(
 
         if (stderrLower.includes('authentication') || stderrLower.includes('not logged in') || stderrLower.includes('login')) {
           reject(Errors.upstreamAuthError());
+          return;
+        }
+
+        // Detect memory errors (heap exhaustion, OOM)
+        const memoryPatterns = ['out of memory', 'heap limit', 'allocation failed'];
+        if (memoryPatterns.some(pattern => stderrLower.includes(pattern))) {
+          reject(Errors.memoryError({
+            exitCode: code,
+            stderr: stderr.trim(),
+            hint: 'Session may be too large. Try starting a new session.',
+          }));
           return;
         }
 
