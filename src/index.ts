@@ -11,6 +11,8 @@ import { createOpenAIRouter } from './routes/openai.js';
 import { createAnthropicRouter } from './routes/anthropic.js';
 import { WorkerPool } from './lib/worker-pool.js';
 import { SessionStore } from './lib/session-store.js';
+import { TaskStore } from './lib/task-store.js';
+import { createTasksRouter } from './routes/tasks.js';
 import { ApiError, Errors } from './lib/errors.js';
 
 // Load configuration
@@ -23,6 +25,11 @@ const workerPool = new WorkerPool(config, logger);
 // Create session store (Phase 3)
 const sessionStore = new SessionStore(config, logger);
 sessionStore.startCleanup();
+
+// Create task store (Phase 6 - Background Tasks)
+const taskStore = new TaskStore(sessionStore.getDatabase(), logger);
+taskStore.markOrphanedTasksFailed();
+taskStore.startCleanup();
 
 // Create Express app
 const app = express();
@@ -48,6 +55,7 @@ app.use(createHealthRouter(workerPool, sessionStore));
 const authMiddleware = createAuthMiddleware(config.proxyApiKey);
 app.use('/api', authMiddleware, createApiRouter(workerPool, sessionStore, logger));
 app.use('/api/sessions', authMiddleware, createSessionsRouter(sessionStore, logger));
+app.use('/api/tasks', authMiddleware, createTasksRouter(taskStore, workerPool, sessionStore, logger));
 
 // OpenAI-compatible routes (Phase 4)
 app.use('/v1', authMiddleware, createOpenAIRouter(workerPool, sessionStore, logger));
@@ -113,6 +121,9 @@ async function shutdown(signal: string): Promise<void> {
 
   // Shutdown worker pool (wait for active tasks)
   await workerPool.shutdown();
+
+  // Shutdown task store
+  taskStore.stopCleanup();
 
   // Shutdown session store
   sessionStore.shutdown();

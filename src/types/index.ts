@@ -160,3 +160,64 @@ export interface SessionInfo {
   /** When the session was last accessed */
   lastAccessedAt: string;
 }
+
+/**
+ * Task status (Phase 6 - Background Tasks)
+ */
+export type TaskStatus = 'running' | 'completed' | 'failed';
+
+/**
+ * Background task record
+ */
+export interface Task {
+  /** External task ID (UUID) */
+  id: string;
+  /** Current task status */
+  status: TaskStatus;
+  /** Hashed API key that owns this task */
+  apiKeyHash: string;
+  /** The prompt sent to Claude */
+  prompt: string;
+  /** Model to use */
+  model?: string;
+  /** Allowed tools */
+  allowedTools?: string[];
+  /** Working directory for execution */
+  workingDirectory?: string;
+  /** Session ID for --resume */
+  sessionId?: string;
+  /** Maximum agentic turns */
+  maxTurns?: number;
+  /** Claude's response (completed only) */
+  result?: string;
+  /** Failure reason: cancelled, timeout, error:..., server_restart */
+  failureReason?: string;
+  /** Claude's session ID returned after execution */
+  claudeSessionId?: string;
+  /** When the task was created */
+  createdAt: Date;
+  /** When execution started */
+  startedAt?: Date;
+  /** When task completed/failed */
+  completedAt?: Date;
+  /** Execution duration in milliseconds */
+  durationMs?: number;
+}
+
+/**
+ * Request body for POST /api/tasks
+ */
+export interface TaskCreateRequest {
+  /** The prompt to send to Claude */
+  prompt: string;
+  /** Optional model to use */
+  model?: string;
+  /** Optional list of tools to allow */
+  allowedTools?: string[];
+  /** Optional working directory */
+  workingDirectory?: string;
+  /** Optional session ID to resume */
+  sessionId?: string;
+  /** Optional maximum agentic turns */
+  maxTurns?: number;
+}

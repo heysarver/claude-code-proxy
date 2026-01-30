@@ -82,6 +82,13 @@ export class SessionStore {
   }
 
   /**
+   * Get the database instance (for sharing with other stores)
+   */
+  getDatabase(): Database.Database {
+    return this.db;
+  }
+
+  /**
    * Start the session cleanup timer
    */
   startCleanup(): void {

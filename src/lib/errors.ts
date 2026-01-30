@@ -30,6 +30,8 @@ export const ErrorCodes = {
   STREAMING_NOT_SUPPORTED: 'streaming_not_supported',
   /** Claude CLI ran out of memory */
   MEMORY_ERROR: 'memory_error',
+  /** Task not found (Phase 6) */
+  TASK_NOT_FOUND: 'task_not_found',
 } as const;
 
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];
@@ -115,6 +117,9 @@ export const Errors = {
 
   memoryError: (details?: Record<string, unknown>) =>
     new ApiError(500, ErrorCodes.MEMORY_ERROR, 'Claude CLI ran out of memory', details),
+
+  taskNotFound: (taskId: string) =>
+    new ApiError(404, ErrorCodes.TASK_NOT_FOUND, `Task not found: ${taskId}`),
 };
 
 /**

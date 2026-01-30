@@ -39,6 +39,40 @@ export function createDatabase(dbPath: string, logger: Logger): Database.Databas
     ON sessions(api_key_hash)
   `);
 
+  // Create tasks table (Phase 6 - Background Tasks)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS tasks (
+      id TEXT PRIMARY KEY,
+      status TEXT NOT NULL CHECK(status IN ('running', 'completed', 'failed')),
+      api_key_hash TEXT NOT NULL,
+      prompt TEXT NOT NULL,
+      model TEXT,
+      allowed_tools TEXT,
+      working_directory TEXT,
+      session_id TEXT,
+      max_turns INTEGER,
+      result TEXT,
+      failure_reason TEXT,
+      claude_session_id TEXT,
+      created_at TEXT NOT NULL,
+      started_at TEXT,
+      completed_at TEXT,
+      duration_ms INTEGER
+    )
+  `);
+
+  // Index for listing tasks by API key
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_tasks_api_key_hash
+    ON tasks(api_key_hash)
+  `);
+
+  // Index for TTL cleanup queries
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_tasks_status_completed
+    ON tasks(status, completed_at)
+  `);
+
   logger.info('Database initialized', { path: dbPath });
 
   return db;
