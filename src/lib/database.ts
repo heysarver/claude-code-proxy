@@ -19,6 +19,8 @@ export function createDatabase(dbPath: string, logger: Logger): Database.Databas
 
   // Enable WAL mode for better concurrent read/write performance
   db.pragma('journal_mode = WAL');
+  // Avoid immediate SQLITE_BUSY when another process is writing
+  db.pragma('busy_timeout = 5000');
 
   // Create sessions table
   db.exec(`
