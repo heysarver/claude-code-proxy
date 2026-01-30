@@ -1,5 +1,5 @@
 import { spawn, ChildProcess } from 'node:child_process';
-import type { ClaudeRunOptions, ClaudeRunResult, StreamChunk } from '../types/index.js';
+import type { ClaudeRunOptions, ClaudeRunResult } from '../types/index.js';
 import { Errors } from './errors.js';
 import type { Logger } from '../config.js';
 
@@ -24,7 +24,7 @@ export async function runClaude(
   options: ClaudeRunOptions,
   logger: Logger
 ): Promise<ClaudeRunResult> {
-  const { prompt, model, allowedTools, workingDirectory, timeoutMs = DEFAULT_TIMEOUT_MS, resumeSessionId, abortSignal, stream, onChunk } = options;
+  const { prompt, model, allowedTools, workingDirectory, timeoutMs = DEFAULT_TIMEOUT_MS, resumeSessionId, abortSignal, stream, onChunk, maxTurns } = options;
 
   // Check if already aborted
   if (abortSignal?.aborted) {
@@ -32,8 +32,9 @@ export async function runClaude(
   }
 
   // Build command arguments
+  // --dangerously-skip-permissions is required for headless/proxy operation
   const outputFormat = stream ? 'stream-json' : 'json';
-  const args: string[] = ['-p', prompt, '--output-format', outputFormat];
+  const args: string[] = ['-p', prompt, '--output-format', outputFormat, '--dangerously-skip-permissions'];
 
   if (model) {
     args.push('--model', model);
@@ -45,6 +46,10 @@ export async function runClaude(
 
   if (resumeSessionId) {
     args.push('--resume', resumeSessionId);
+  }
+
+  if (maxTurns && maxTurns > 0) {
+    args.push('--max-turns', String(maxTurns));
   }
 
   logger.debug('Spawning Claude CLI', {
@@ -196,6 +201,17 @@ export async function runClaude(
 
         if (stderrLower.includes('authentication') || stderrLower.includes('not logged in') || stderrLower.includes('login')) {
           reject(Errors.upstreamAuthError());
+          return;
+        }
+
+        // Detect memory errors (heap exhaustion, OOM)
+        const memoryPatterns = ['out of memory', 'heap limit', 'allocation failed'];
+        if (memoryPatterns.some(pattern => stderrLower.includes(pattern))) {
+          reject(Errors.memoryError({
+            exitCode: code,
+            stderr: stderr.trim(),
+            hint: 'Session may be too large. Try starting a new session.',
+          }));
           return;
         }
 

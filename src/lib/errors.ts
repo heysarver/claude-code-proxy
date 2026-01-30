@@ -28,6 +28,8 @@ export const ErrorCodes = {
   SESSION_LIMIT_REACHED: 'session_limit_reached',
   /** Streaming not supported (Phase 4) */
   STREAMING_NOT_SUPPORTED: 'streaming_not_supported',
+  /** Claude CLI ran out of memory */
+  MEMORY_ERROR: 'memory_error',
 } as const;
 
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];
@@ -110,6 +112,9 @@ export const Errors = {
 
   streamingNotSupported: () =>
     new ApiError(400, ErrorCodes.STREAMING_NOT_SUPPORTED, 'Streaming is not yet supported. Set stream: false or omit the stream parameter.'),
+
+  memoryError: (details?: Record<string, unknown>) =>
+    new ApiError(500, ErrorCodes.MEMORY_ERROR, 'Claude CLI ran out of memory', details),
 };
 
 /**
@@ -120,7 +125,7 @@ export const Errors = {
 export function isRetryableError(error: unknown): boolean {
   if (error instanceof ApiError) {
     // Only retry transient errors
-    return [ErrorCodes.TIMEOUT, ErrorCodes.RATE_LIMIT].includes(error.code);
+    return error.code === ErrorCodes.TIMEOUT || error.code === ErrorCodes.RATE_LIMIT;
   }
   // Network errors are retryable
   if (error instanceof Error && error.message.includes('ECONNRESET')) {
