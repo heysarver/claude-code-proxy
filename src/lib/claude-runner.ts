@@ -1,7 +1,8 @@
 import { spawn, ChildProcess } from 'node:child_process';
-import type { ClaudeRunOptions, ClaudeRunResult } from '../types/index.js';
+import { existsSync, mkdirSync } from 'node:fs';
+import type { ClaudeRunOptions, ClaudeRunResult, StreamChunk } from '../types/index.js';
 import { Errors } from './errors.js';
-import type { Logger } from '../config.js';
+import type { Logger, Config } from '../config.js';
 
 /**
  * Default timeout for Claude CLI execution (5 minutes)
@@ -18,13 +19,36 @@ const KILL_GRACE_PERIOD_MS = 5000;
  *
  * @param options - Options for Claude CLI execution
  * @param logger - Logger instance
+ * @param config - Application configuration
  * @returns Promise resolving to Claude's response
  */
 export async function runClaude(
   options: ClaudeRunOptions,
-  logger: Logger
+  logger: Logger,
+  config: Config
 ): Promise<ClaudeRunResult> {
   const { prompt, model, allowedTools, workingDirectory, timeoutMs = DEFAULT_TIMEOUT_MS, resumeSessionId, abortSignal, stream, onChunk, maxTurns } = options;
+
+  // Apply default workspace directory if none provided
+  const effectiveWorkDir = workingDirectory || config.defaultWorkspaceDir;
+
+  // Validate against path traversal
+  if (effectiveWorkDir && effectiveWorkDir.includes('..')) {
+    throw Errors.invalidRequest(`Invalid working directory path: contains path traversal`);
+  }
+
+  // Create workspace directory if it doesn't exist
+  if (effectiveWorkDir && !existsSync(effectiveWorkDir)) {
+    try {
+      mkdirSync(effectiveWorkDir, { recursive: true });
+      logger.info('Created working directory', { path: effectiveWorkDir });
+    } catch (err) {
+      throw Errors.cliError(`Failed to create working directory: ${effectiveWorkDir}`, {
+        path: effectiveWorkDir,
+        cause: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
 
   // Check if already aborted
   if (abortSignal?.aborted) {
@@ -33,6 +57,7 @@ export async function runClaude(
 
   // Build command arguments
   // --dangerously-skip-permissions is required for headless/proxy operation
+  // without it, Claude CLI waits for user input on permission prompts
   const outputFormat = stream ? 'stream-json' : 'json';
   const args: string[] = ['-p', prompt, '--output-format', outputFormat, '--dangerously-skip-permissions'];
 
@@ -54,7 +79,7 @@ export async function runClaude(
 
   logger.debug('Spawning Claude CLI', {
     args: args.map((a, i) => (i === 1 ? '[prompt]' : a)), // Don't log full prompt
-    workingDirectory,
+    workingDirectory: effectiveWorkDir,
     timeoutMs,
   });
 
@@ -69,7 +94,7 @@ export async function runClaude(
       child = spawn('claude', args, {
         shell: false,
         stdio: ['ignore', 'pipe', 'pipe'],
-        cwd: workingDirectory,
+        cwd: effectiveWorkDir,
         env: { ...process.env },
       });
     } catch (err) {

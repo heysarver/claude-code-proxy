@@ -1,3 +1,5 @@
+import { homedir } from 'node:os';
+
 /**
  * Application configuration loaded from environment variables
  */
@@ -24,6 +26,8 @@ export interface Config {
   sessionCleanupIntervalMs: number;
   /** Path to SQLite database file for session persistence */
   sessionDbPath: string;
+  /** Default working directory for Claude CLI execution */
+  defaultWorkspaceDir: string;
 }
 
 /**
@@ -41,6 +45,7 @@ export function loadConfig(): Config {
   const maxSessionsPerKey = parseInt(process.env.MAX_SESSIONS_PER_KEY || '10', 10);
   const sessionCleanupIntervalMs = parseInt(process.env.SESSION_CLEANUP_INTERVAL_MS || '60000', 10);
   const sessionDbPath = process.env.SESSION_DB_PATH || './data/sessions.db';
+  const defaultWorkspaceDir = process.env.DEFAULT_WORKSPACE_DIR || `${homedir()}/claudewksp`;
 
   // Validation
   if (!proxyApiKey) {
@@ -83,6 +88,10 @@ export function loadConfig(): Config {
     throw new Error('SESSION_CLEANUP_INTERVAL_MS must be at least 1000ms');
   }
 
+  if (defaultWorkspaceDir.includes('..')) {
+    throw new Error('DEFAULT_WORKSPACE_DIR cannot contain path traversal (..)');
+  }
+
   return {
     port,
     proxyApiKey,
@@ -95,6 +104,7 @@ export function loadConfig(): Config {
     maxSessionsPerKey,
     sessionCleanupIntervalMs,
     sessionDbPath,
+    defaultWorkspaceDir,
   };
 }
 
