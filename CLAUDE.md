@@ -59,6 +59,7 @@ import { foo } from './lib/foo.ts';
 | `PROXY_API_KEY` | **Yes** | - | API key for authentication |
 | `REQUEST_TIMEOUT_MS` | No | 300000 | Request timeout (5 min) |
 | `LOG_LEVEL` | No | info | debug, info, warn, error |
+| `DEFAULT_MODEL` | No | haiku | Default Claude model (opus, sonnet, haiku) |
 
 ## API Endpoints
 
@@ -72,8 +73,19 @@ Request body:
 ```json
 {
   "prompt": "Your prompt here",
+  "model": "haiku",                   // optional, defaults to DEFAULT_MODEL
   "allowedTools": ["Read", "Write"],  // optional
   "workingDirectory": "/path/to/dir"  // optional
+}
+```
+
+Response includes the effective model used:
+```json
+{
+  "id": "request-uuid",
+  "result": "Claude's response",
+  "model": "haiku",
+  "durationMs": 1234
 }
 ```
 
