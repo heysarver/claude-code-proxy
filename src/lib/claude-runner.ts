@@ -51,8 +51,10 @@ export async function runClaude(
   }
 
   // Build command arguments
+  // --dangerously-skip-permissions is required for headless/proxy operation
+  // without it, Claude CLI waits for user input on permission prompts
   const outputFormat = stream ? 'stream-json' : 'json';
-  const args: string[] = ['-p', prompt, '--output-format', outputFormat];
+  const args: string[] = ['-p', prompt, '--output-format', outputFormat, '--dangerously-skip-permissions'];
 
   if (model) {
     args.push('--model', model);
